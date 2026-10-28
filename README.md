@@ -10,8 +10,10 @@
 | Öğretmen Paneli | `/ogretmen` |
 | Öğrenci Paneli | `/ogrenci` |
 | Veli Paneli | `/veli` |
+| Giriş (öğretmen, öğrenci, veli) | `/giris` |
+| Yönetim (şubeler, öğrenciler, davetler) | `/yonetim` |
 
-> Şu an demo sürümüdür: veriler yalnızca tarayıcıda tutulur, yapay zekâ üretimi taklittir. Gerçek uygulamaya geçiş planı: [docs/YOL-HARITASI.md](docs/YOL-HARITASI.md)
+> **Faz 1 canlıda:** hesaplar, roller, sınıf kodu + PIN ile öğrenci girişi ve Claude ile etkinlik üretimi Supabase üzerinde çalışıyor ([docs/FAZ1.md](docs/FAZ1.md)). Panellerin içeriği hâlâ demo verisidir; taşınma planı: [docs/YOL-HARITASI.md](docs/YOL-HARITASI.md)
 
 ## Geliştirme
 
@@ -34,7 +36,8 @@ src/js/     Uygulama modülleri; sırası scripts/build.mjs içinde tanımlı
             06–11         öğretmen ekranları     24-vis       etkileşimli görseller (pizza, kan yolculuğu…)
             13–17         öğrenci ekranları      26-onboard   Navi tanışma formu
             20-veli       veli paneli            27-report    3 aylık gelişim raporu
-public/     Giriş sayfası, simgeler, hizmet çalışanı (sw.js)
+public/     Giriş ve yönetim sayfaları (app/), simgeler, hizmet çalışanı (sw.js), supabase-js (vendor/)
+supabase/   migrations/ (veritabanı şeması + güvenlik), functions/ (sunucu fonksiyonları)
 scripts/    build.mjs (derleme), serve.mjs (yerel sunucu)
 tests/      smoke.mjs (uçtan uca testler)
 docs/       Yol haritası ve kararlar

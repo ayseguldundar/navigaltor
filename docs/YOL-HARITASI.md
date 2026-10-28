@@ -1,6 +1,6 @@
 # NavigAItor — Demodan gerçek web uygulamasına yol haritası
 
-_Son güncelleme: 29 Ekim 2026_
+_Son güncelleme: 29 Ekim 2026 — Faz 1 canlıda, Faz 3'ün yapay zekâ ucu hazır (API anahtarı bekliyor)_
 
 ## Bugün neredeyiz (Faz 0 — tamamlandı)
 
@@ -32,13 +32,22 @@ Kısacası: arayüz ve pedagojik akış ürün kalitesinde; arkasındaki **hesap
 
 ---
 
-## Faz 1 — Hesaplar ve roller (tahmini 2–3 hafta)
+## Faz 1 — Hesaplar ve roller ✅ (29 Ekim 2026)
+
+**Kararlar:** Supabase (AB-Frankfurt) · öğrenci girişi sınıf kodu + PIN · yapay zekâ Claude.
+
+**Yapılanlar:** okul/şube/öğrenci/veli tabloları ve satır düzeyi güvenlik (`supabase/migrations`), sunucu fonksiyonları (`supabase/functions`), giriş merkezi (`/giris`), yönetim konsolu (`/yonetim`), panellerde oturum köprüsü. Ayrıntı: [FAZ1.md](FAZ1.md).
+
+<details><summary>Başlangıç planı</summary>
+
 
 - Roller: **okul yöneticisi, öğretmen, öğrenci, veli**. Her kayıt bir okula bağlı (çok okullu yapı baştan kurulur).
 - **Öğretmen:** e-posta + şifre (veya Google ile giriş).
 - **Öğrenci:** sınıf kodu + kişisel PIN veya QR kart. 5–8. sınıf öğrencilerinden e-posta istemek hem gerçekçi değil hem KVKK açısından gereksiz veri.
 - **Veli:** öğretmenin gönderdiği davet bağlantısıyla; bağlantı veli onayı (açık rıza) adımını içerir.
 - Okul yöneticisi öğretmen ve şube ekler; öğretmen öğrenci listesini içe aktarır (Excel/CSV).
+
+</details>
 
 ## Faz 2 — Verinin sunucuya taşınması (tahmini 3–4 hafta)
 

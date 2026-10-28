@@ -19,7 +19,7 @@ const CORE = [
   '18-parent.js', '19-sims.js',
 ];
 const APP_JS = [...CORE, '22-resmi-act.js', '24-vis.js', '25-b21.js', '25-lib-data.js', '25-lib.js',
-  '26-onboard.js', '27-report.js', '28-hooks.js', '99-init.js'];
+  '26-onboard.js', '27-report.js', '28-hooks.js', '29-ai-real.js', '99-init.js'];
 const VELI_JS = [...CORE, '20-veli.js', '22-resmi-act.js', '26-onboard.js', '99-init-veli.js'];
 
 const PANELS = [
@@ -52,7 +52,9 @@ const pwaHead = (panel) => `<meta name="theme-color" content="#810000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="NavigAItor ${panel.short}">`;
 
-const swRegister = `<script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script>`;
+const swRegister = `<script src="/config.js"></script>
+<script type="module" src="/app/oturum.js"></script>
+<script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script>`;
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -95,6 +97,8 @@ ${swRegister}
 }
 
 // Hizmet çalışanı: önbellek sürümü içerikten türetilir, her yeni derlemede eski önbellek temizlenir.
+const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);
+for (const f of walk(join(ROOT, 'public')).sort()) hash.update(readFileSync(f));
 const version = hash.digest('hex').slice(0, 10);
 const sw = readFileSync(join(ROOT, 'public', 'sw.js'), 'utf8').replace('__BUILD_VERSION__', version);
 writeFileSync(join(OUT, 'sw.js'), sw);

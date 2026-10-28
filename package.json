@@ -1,14 +1,16 @@
 {
   "name": "navigaitor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "NavigAItor — 5–8. sınıflar için yapay zekâ destekli uyarlanabilir öğrenme platformu (web uygulaması)",
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "serve": "node scripts/serve.mjs",
-    "test": "node scripts/build.mjs && node tests/smoke.mjs"
+    "test": "node scripts/build.mjs && node tests/smoke.mjs && node tests/auth-flows.mjs"
   },
   "devDependencies": {
     "playwright": "^1.48.0"

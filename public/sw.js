@@ -2,9 +2,10 @@
 // Sayfalar: önce ağ, bağlantı yoksa önbellek. Diğer dosyalar: önce önbellek.
 const VERSION = '__BUILD_VERSION__';
 const CACHE = 'navigaitor-' + VERSION;
-const PAGES = ['/', '/ogretmen', '/ogrenci', '/veli'];
+const PAGES = ['/', '/ogretmen', '/ogrenci', '/veli', '/giris', '/yonetim'];
 const ASSETS = ['/manifest-ogretmen.webmanifest', '/manifest-ogrenci.webmanifest', '/manifest-veli.webmanifest',
-  '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
+  '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png',
+  '/config.js', '/vendor/supabase-js-2.117.2.js', '/app/supa.js', '/app/oturum.js', '/app/ortak.css', '/app/giris.js', '/app/yonetim.js', '/app/liste.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll([...PAGES, ...ASSETS])).then(() => self.skipWaiting()));
