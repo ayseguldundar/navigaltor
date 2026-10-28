@@ -4,7 +4,7 @@
   "private": true,
   "description": "NavigAItor — 5–8. sınıflar için yapay zekâ destekli uyarlanabilir öğrenme platformu (web uygulaması)",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "build": "node scripts/build.mjs",
     "serve": "node scripts/serve.mjs",
