@@ -72,7 +72,7 @@ ${VISUALS}
 8. Puanlama rubriği tam 4 ölçüt içerir; her ölçütte 4 (Mükemmel) → 1 (Başlangıç) düzeyleri kısa ve gözlemlenebilir yazılır.
 9. Navi'nin soruları cevabı söylemez; öğrencinin düşünmesini sağlayan sorulardır.
 
-Sonucu yalnızca "etkinlik_kaydet" aracıyla döndür.`;
+Sonucu MUTLAKA "etkinlik_kaydet" aracını bir kez çağırarak döndür; ayrıca düz metin yazma.`;
 
 const TOOL = {
   name: 'etkinlik_kaydet',
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: MODEL, max_tokens: 6000, system: SYSTEM,
-        tools: [TOOL], tool_choice: { type: 'tool', name: TOOL.name },
+        tools: [TOOL], tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -213,13 +213,21 @@ Deno.serve(async (req) => {
     return fail(res.status === 529 || res.status === 429 ? 'Yapay zekâ şu an yoğun. Bir dakika sonra yeniden deneyin.'
       : 'Taslak üretilemedi.', 502);
   }
-  const use = (out.content ?? []).find((c: { type: string }) => c.type === 'tool_use');
-  if (!use?.input) {
-    await admin.from('ai_generations').update({ status: 'error', error: 'tool_use yok' }).eq('id', row?.id);
-    return fail('Taslak üretilemedi.', 502);
+  // Model aracı çağırır; çağırmazsa metin içindeki JSON nesnesi kullanılır.
+  const blocks = (out.content ?? []) as Array<{ type: string; input?: Record<string, unknown>; text?: string }>;
+  let draft = blocks.find((c) => c.type === 'tool_use')?.input;
+  if (!draft) {
+    const txt = blocks.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+    const m = txt.match(/\{[\s\S]*\}/);
+    try { draft = m ? JSON.parse(m[0]) : undefined; } catch { draft = undefined; }
+  }
+  const missing = TOOL.input_schema.required.filter((k) => !draft || draft[k] == null);
+  if (!draft || missing.length > 2) {
+    await admin.from('ai_generations').update({ status: 'error', error: 'eksik çıktı: ' + missing.join(',') }).eq('id', row?.id);
+    return fail('Taslak eksik üretildi. Yeniden deneyin.', 502);
   }
   const activity = stripCodes({
-    ...use.input,
+    ...draft,
     course, grade, duration: req_.duration, format: req_.format, themeName: req_.unit,
     aiLevel: level, aiNote: req_.note, src: 'AI', model: MODEL,
   }) as Record<string, unknown>;
