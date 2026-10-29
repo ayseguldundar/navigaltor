@@ -19,11 +19,13 @@ const viewText = () => page.evaluate(() => document.querySelector('#view')?.inne
 
 try {
   // Giriş sayfası
+  await page.goto(BASE + '/demo');
+  check((await page.locator('a.card').count()) === 3, 'demo sayfasında üç panel bağlantısı var');
   await page.goto(BASE + '/');
-  check((await page.locator('a.card').count()) === 3, 'giriş sayfasında üç panel bağlantısı var');
+  check((await page.title()) === 'NavigAItor' && (await page.locator('a[href="/giris"]').count()) > 0, 'ana sayfa yeni tasarımla açılıyor ve giriş bağlantısı var');
 
   // Öğretmen paneli: tüm sayfalar
-  await page.goto(BASE + '/ogretmen');
+  await page.goto(BASE + '/demo/ogretmen');
   await page.evaluate(() => localStorage.clear());
   await page.reload(); await page.waitForTimeout(800);
   check(page.url().endsWith('#home'), 'öğretmen paneli ana sayfada açılıyor');
@@ -54,7 +56,7 @@ try {
   check(await page.evaluate(() => DB.st.plan.some((t) => t.lib === 'sos-7-12')), 'öğretmenin atadığı etkinlik öğrenci planına düştü');
 
   const stu = await ctx.newPage();
-  await stu.goto(BASE + '/ogrenci'); await stu.waitForTimeout(1000);
+  await stu.goto(BASE + '/demo/ogrenci'); await stu.waitForTimeout(1000);
   check(!!(await stu.$('#obLayer .ob-card')), 'öğrencinin ilk girişinde tanışma formu açılıyor');
   await stu.click('#obLayer [data-act="obNext"]'); await stu.waitForTimeout(200);
   await stu.click('#obLayer [data-act="obLater"]'); await stu.waitForTimeout(200);
@@ -72,7 +74,7 @@ try {
   check(done, 'öğrencinin tamamladığı etkinlik öğretmen panelinde görünüyor');
 
   // Veli paneli
-  await page.goto(BASE + '/veli'); await page.waitForTimeout(800);
+  await page.goto(BASE + '/demo/veli'); await page.waitForTimeout(800);
   check(page.url().endsWith('#v-home'), 'veli paneli açılıyor');
   await go('v-mesaj');
   check(page.url().endsWith('#v-home'), 'veli panelinde mesajlaşma kapalı');
@@ -80,15 +82,15 @@ try {
   // PWA
   for (const p of ['ogretmen', 'ogrenci', 'veli']) {
     const m = await (await fetch(`${BASE}/manifest-${p}.webmanifest`)).json();
-    check(m.start_url === '/' + p && m.icons.length === 3, `${p} uygulama bildirimi (manifest) geçerli`);
+    check(m.start_url === { ogretmen: '/yonetim', ogrenci: '/ogrenci', veli: '/veli' }[p] && m.icons.length === 3, `${p} uygulama bildirimi (manifest) geçerli`);
   }
-  await page.goto(BASE + '/ogretmen'); await page.waitForTimeout(1500);
+  await page.goto(BASE + '/demo/ogretmen'); await page.waitForTimeout(1500);
   const sw = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
   check(sw, 'hizmet çalışanı (çevrimdışı destek) kayıtlı');
 
   // Mobil genişlik
   const mob = await ctx.newPage(); await mob.setViewportSize({ width: 390, height: 844 });
-  await mob.goto(BASE + '/ogrenci#o-home'); await mob.waitForTimeout(800);
+  await mob.goto(BASE + '/demo/ogrenci#o-home'); await mob.waitForTimeout(800);
   check((await mob.evaluate(() => document.documentElement.scrollWidth)) <= 392, 'telefonda yatay taşma yok');
 
   check(errors.length === 0, `tarayıcı hatası yok${errors.length ? '\n  ' + errors.slice(0, 5).join('\n  ') : ''}`);

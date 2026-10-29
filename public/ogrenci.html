@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NavigAItor Öğrenci</title>
+<meta name="theme-color" content="#810000">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest-ogrenci.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+<link rel="stylesheet" href="/app/ortak.css">
+<link rel="stylesheet" href="/app/etkinlik.css">
+<style>
+body{font-family:Nunito,Manrope,system-ui,sans-serif;background:radial-gradient(900px 500px at 100% -10%,#FFE3C2 0%,transparent 60%),radial-gradient(900px 500px at -10% 10%,#E6E1FF 0%,transparent 55%),#FFF8F0}
+h1,h2,h3{font-family:Fraunces,Georgia,serif}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.me{display:flex;align-items:center;gap:10px;margin-left:auto}
+.me .av{width:42px;height:42px;border-radius:50%;background:#FFE7A8;overflow:hidden;display:grid;place-items:center}
+.hi{display:flex;gap:16px;align-items:center;padding:20px;border-radius:24px;background:linear-gradient(120deg,#810000,#D9363E);color:#fff;margin-bottom:18px;box-shadow:0 18px 40px -26px #810000}
+.hi img{width:96px;height:110px;object-fit:cover;object-position:50% 15%;border-radius:20px;background:#F8EEDF;flex:none}
+.hi h1{font-size:26px;color:#fff}.hi p{margin:4px 0 0;opacity:.95}
+.tasks{display:grid;gap:10px}
+.task{display:flex;gap:14px;align-items:center;padding:14px 16px;border-radius:18px;background:#fff;border:1px solid var(--line);text-decoration:none;color:inherit;box-shadow:0 10px 24px -20px rgba(60,30,10,.5)}
+.task:hover{border-color:#D8C8B0}
+.task .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:24px;flex:none;color:#fff}
+.task b{display:block;font-size:16px}.task small{color:var(--muted)}
+.st{margin-left:auto;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.st.yeni{background:#FFF1EC;color:#810000}.st.devam{background:#FFF4D9;color:#7A5A12}.st.ok{background:var(--ok-bg);color:var(--ok)}
+.sec-t{font-size:20px;margin:22px 0 10px}
+.fb{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:#EEF6FF;border:1px solid #CFE2FA;margin-bottom:14px}
+.done-box{margin-top:16px;padding:18px;border-radius:20px;background:#fff;border:1px solid var(--line)}
+.celebrate{display:flex;gap:14px;align-items:center;padding:16px;border-radius:18px;background:var(--ok-bg);color:var(--ok);font-weight:800;margin-bottom:14px}
+.celebrate img{width:64px;height:72px;object-fit:cover;object-position:50% 15%;border-radius:14px;background:#F8EEDF}
+@media (max-width:640px){.hi{padding:16px}.hi img{width:72px;height:84px}.hi h1{font-size:22px}.top .brand b{display:none}.me{gap:6px}.me .btn{padding:6px 9px}.me .lbl{display:none}}
+.top{min-width:0}.me{min-width:0}
+#obLayer:empty{display:none}
+</style>
+<script src="/config.js"></script>
+<script src="/app/kit-gorsel.js"></script>
+<script src="/app/navi.js"></script>
+</head>
+<body>
+<div class="wrap" style="max-width:920px">
+  <div class="top"><a class="brand" href="/ogrenci"><span class="logo">N</span><b>NavigAItor</b></a><div class="me" id="me"></div></div>
+  <main id="app" aria-live="polite"><div class="card"><p class="muted">Yükleniyor…</p></div></main>
+</div>
+<div id="obLayer"></div>
+<script type="module" src="/app/ogrenci.js"></script>
+<script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script>
+</body>
+</html>

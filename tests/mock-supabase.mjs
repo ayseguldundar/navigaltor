@@ -7,7 +7,7 @@ const id = (p) => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}${p
 const code = (n) => Array.from({ length: n }, (_, i) => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[(seq * 7 + i * 13) % 31]).join('');
 
 export function createMock() {
-  const db = { users: [], profiles: [], schools: [], sections: [], ts: [], students: [], secrets: {}, guardians: [], invites: [], gens: [] };
+  const db = { users: [], profiles: [], schools: [], sections: [], ts: [], students: [], secrets: {}, guardians: [], invites: [], gens: [], assignments: [], submissions: [], drafts: [], intake: [], adminLog: [] };
   const calls = [];
   const userByToken = (h) => { const t = (h || '').replace(/^Bearer\s+/i, ''); return db.users.find((u) => u.token === t); };
   const profileOf = (u) => u && db.profiles.find((p) => p.id === u.id);
@@ -37,6 +37,37 @@ export function createMock() {
     create_parent_invite: (me, a) => { const c = code(8); db.invites.push({ code: c, kind: 'parent', student_id: a.p_student, school_id: me.school_id, used_at: null, expires_at: new Date(Date.now() + 864e5 * 30).toISOString(), created_at: new Date().toISOString() }); return c; },
     create_teacher_invite: (me) => { if (me.role !== 'admin') throw new Error('Yalnızca okul yöneticisi'); const c = code(8); db.invites.push({ code: c, kind: 'teacher', school_id: me.school_id, used_at: null, expires_at: new Date(Date.now() + 864e5 * 30).toISOString(), created_at: new Date().toISOString() }); return c; },
     add_teacher_to_section: (me, a) => { db.ts.push({ teacher_id: a.p_teacher, section_id: a.p_section, course: a.p_course, is_guidance: a.p_guidance }); return null; },
+    create_assignment: (me, a) => {
+      if (!sectionView(me).some((s) => s.id === a.p_section)) throw new Error('Bu şubeye etkinlik atama yetkiniz yok');
+      if (!['MAT', 'TUR', 'FEN', 'SOS', 'ING'].includes(a.p_activity.course)) throw new Error('Etkinliğin dersi geçersiz');
+      const x = { id: id(), school_id: me.school_id, section_id: a.p_section, teacher_id: me.id, title: a.p_activity.title, course: a.p_activity.course, grade: a.p_activity.grade,
+        source: a.p_source, template_id: a.p_template, due_date: a.p_due, created_at: new Date().toISOString(), archived: false, activity: a.p_activity };
+      db.assignments.push(x); return x;
+    },
+    archive_assignment: (me, a) => { db.assignments.find((x) => x.id === a.p_id).archived = a.p_archived; return null; },
+    save_teacher_activity: (me, a) => { const d = { id: id(), school_id: me.school_id, teacher_id: me.id, title: a.p_activity.title, course: a.p_activity.course, grade: a.p_activity.grade, source: a.p_source, created_at: new Date().toISOString(), activity: a.p_activity }; db.drafts.push(d); return d; },
+    delete_teacher_activity: (me, a) => { db.drafts = db.drafts.filter((d) => d.id !== a.p_id); return null; },
+    set_teacher_feedback: (me, a) => {
+      let x = db.submissions.find((y) => y.assignment_id === a.p_assignment && y.student_id === a.p_student);
+      if (!x) { x = { assignment_id: a.p_assignment, student_id: a.p_student, status: 'devam', checklist: [], reflection: '', completed_at: null }; db.submissions.push(x); }
+      x.teacher_feedback = a.p_text; return x;
+    },
+    save_submission: (me, a) => {
+      if (me.role !== 'student') throw new Error('Yalnızca öğrenciler');
+      const st = db.students.find((x) => x.auth_user_id === me.id);
+      const as = db.assignments.find((x) => x.id === a.p_assignment);
+      if (!as || as.section_id !== st.section_id || as.archived) throw new Error('Bu etkinlik sana atanmamış');
+      let x = db.submissions.find((y) => y.assignment_id === as.id && y.student_id === st.id);
+      if (!x) { x = { assignment_id: as.id, student_id: st.id, teacher_feedback: null }; db.submissions.push(x); }
+      Object.assign(x, { status: a.p_status, checklist: a.p_checklist, reflection: a.p_reflection, completed_at: a.p_status === 'tamamlandi' ? (x.completed_at || new Date().toISOString()) : null });
+      return x;
+    },
+    save_intake: (me, a) => {
+      const st = db.students.find((x) => x.auth_user_id === me.id);
+      let x = db.intake.find((y) => y.student_id === st.id);
+      if (!x) { x = { student_id: st.id, completed: false }; db.intake.push(x); }
+      x.answers = a.p_answers; x.completed = x.completed || a.p_completed; x.updated_at = new Date().toISOString(); return null;
+    },
   };
 
   const fns = {
@@ -48,10 +79,14 @@ export function createMock() {
       else { school = id(); db.schools.push({ id: school, name: b.schoolName }); role = 'admin'; }
       db.profiles.push({ id: u.id, school_id: school, role, full_name: b.fullName }); return [200, { ok: true, role }];
     },
-    'kayit-veli': (b) => {
+    'kayit-veli': (b, me) => {
       if (b.consent !== true) return [400, { error: 'Devam etmek için açık rıza metnini onaylamanız gerekiyor.' }];
-      const inv = db.invites.find((i) => i.code === b.inviteCode && i.kind === 'parent' && !i.used_at);
+      const inv = db.invites.find((i) => i.code === String(b.inviteCode || '').toUpperCase() && i.kind === 'parent' && !i.used_at);
       if (!inv) return [400, { error: 'Davet kodu geçersiz, kullanılmış veya süresi dolmuş' }];
+      if (b.mode === 'link') {
+        if (!me || me.role !== 'parent') return [401, { error: 'Oturum bulunamadı. Yeniden giriş yapın.' }];
+        db.guardians.push({ parent_id: me.id, student_id: inv.student_id }); inv.used_at = new Date().toISOString(); return [200, { ok: true }];
+      }
       const u = addUser(b.email, b.password);
       db.profiles.push({ id: u.id, school_id: inv.school_id, role: 'parent', full_name: b.fullName });
       db.guardians.push({ parent_id: u.id, student_id: inv.student_id }); inv.used_at = new Date().toISOString(); return [200, { ok: true }];
@@ -84,6 +119,28 @@ export function createMock() {
     },
   };
 
+  fns['veri-sil'] = (b, me) => {
+    if (!me || me.role !== 'admin') return [403, { error: 'Bu işlemi yalnızca okul yöneticisi yapabilir' }];
+    const st = db.students.find((x) => x.id === b.studentId && x.school_id === me.school_id);
+    if (!st) return [403, { error: 'Öğrenci bulunamadı' }];
+    const parents = db.guardians.filter((g) => g.student_id === st.id && !db.guardians.some((g2) => g2.parent_id === g.parent_id && g2.student_id !== st.id)).map((g) => g.parent_id);
+    const gone = new Set([st.auth_user_id, ...parents].filter(Boolean));
+    db.students = db.students.filter((x) => x.id !== st.id);
+    db.submissions = db.submissions.filter((x) => x.student_id !== st.id);
+    db.intake = db.intake.filter((x) => x.student_id !== st.id);
+    db.guardians = db.guardians.filter((x) => x.student_id !== st.id);
+    db.invites = db.invites.filter((x) => x.student_id !== st.id);
+    db.users = db.users.filter((u) => !gone.has(u.id)); db.profiles = db.profiles.filter((p) => !gone.has(p.id));
+    db.adminLog.push({ action: 'ogrenci_sil', actor_id: me.id }); return [200, { ok: true, deletedAccounts: gone.size }];
+  };
+  fns['sifre-sifirla'] = (b, me) => {
+    if (!me || me.role !== 'admin') return [403, { error: 'Bu işlemi yalnızca okul yöneticisi yapabilir' }];
+    const t = db.profiles.find((p) => p.id === b.userId && p.school_id === me.school_id);
+    if (!t || !['teacher', 'parent'].includes(t.role)) return [403, { error: 'Kişi bu okulda bulunamadı' }];
+    const password = 'abcd-EFGH-2345'; db.users.find((u) => u.id === t.id).password = password;
+    db.adminLog.push({ action: 'sifre_sifirla', actor_id: me.id }); return [200, { ok: true, password }];
+  };
+
   // PostgREST sorgu süzgeçlerinin basit taklidi (eq, in, is, gt)
   const filterRows = (rows, params) => rows.filter((r) => [...params].every(([k, v]) => {
     if (['select', 'order', 'limit', 'offset'].includes(k)) return true;
@@ -101,6 +158,13 @@ export function createMock() {
     if (table === 'guardians') return db.guardians;
     if (table === 'invites') return db.invites.filter((i) => i.school_id === me.school_id);
     if (table === 'ai_generations') return db.gens;
+    const staff = ['admin', 'teacher'].includes(me.role);
+    const myStudents = () => visible('students', me);
+    if (table === 'sections') return db.sections.filter((s) => (staff && s.school_id === me.school_id) || myStudents().some((x) => x.section_id === s.id));
+    if (table === 'assignments') return db.assignments.filter((a) => (staff ? sectionView(me).some((x) => x.id === a.section_id) : myStudents().some((x) => x.section_id === a.section_id)));
+    if (table === 'submissions') return db.submissions.filter((x) => (staff ? db.assignments.some((a) => a.id === x.assignment_id && sectionView(me).some((s) => s.id === a.section_id)) : myStudents().some((s) => s.id === x.student_id)));
+    if (table === 'teacher_activities') return staff ? db.drafts.filter((d) => d.school_id === me.school_id) : [];
+    if (table === 'intake_responses') return db.intake.filter((x) => myStudents().some((s) => s.id === x.student_id));
     return [];
   };
 
@@ -123,7 +187,12 @@ export function createMock() {
       const u = db.users.find((x) => 'r-' + x.id === b.refresh_token);
       return u ? send(200, session(u)) : send(400, { msg: 'Invalid Refresh Token' });
     }
-    if (p === '/auth/v1/user') { const u = userByToken(hdr.authorization); return u ? send(200, session(u).user) : send(401, { msg: 'invalid JWT' }); }
+    if (p === '/auth/v1/user') {
+      const u = userByToken(hdr.authorization);
+      if (!u) return send(401, { msg: 'invalid JWT' });
+      if (req.method() === 'PUT') { const b = body(); if (b.password) { if (b.password === u.password) return send(422, { code: 422, error_code: 'same_password', msg: 'New password should be different from the old password.' }); u.password = b.password; } }
+      const t = u.token; const sess = session(u); u.token = t; return send(200, sess.user);
+    }
     if (p === '/auth/v1/logout') return send(204);
 
     const me = profileOf(userByToken(hdr.authorization));
@@ -134,7 +203,8 @@ export function createMock() {
     }
     if (p.startsWith('/rest/v1/')) {
       const rows = filterRows(visible(p.split('/').pop(), me), url.searchParams);
-      if ((hdr.accept || '').includes('vnd.pgrst.object')) return rows.length === 1 ? send(200, rows[0]) : send(406, { message: 'not single' });
+      if (req.method() === 'DELETE' || req.method() === 'POST' || req.method() === 'PATCH') return send(405, { message: 'taklitte yazma yalnızca RPC ile' });
+      if ((hdr.accept || '').includes('vnd.pgrst.object')) return rows.length === 1 ? send(200, rows[0]) : send(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: `The result contains ${rows.length} rows` });
       return send(200, rows);
     }
     if (p.startsWith('/functions/v1/')) {

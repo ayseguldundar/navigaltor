@@ -57,7 +57,7 @@ const swRegister = `<script src="/config.js"></script>
 <script>if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script>`;
 
 rmSync(OUT, { recursive: true, force: true });
-mkdirSync(OUT, { recursive: true });
+mkdirSync(join(OUT, 'demo'), { recursive: true });
 cpSync(join(ROOT, 'public'), OUT, { recursive: true });
 
 const hash = createHash('sha1');
@@ -81,11 +81,11 @@ ${swRegister}
 </body>
 </html>
 `;
-  writeFileSync(join(OUT, `${panel.slug}.html`), html);
+  writeFileSync(join(OUT, 'demo', `${panel.slug}.html`), html);
   hash.update(html);
   writeFileSync(join(OUT, `manifest-${panel.slug}.webmanifest`), JSON.stringify({
     name: panel.title, short_name: `NavigAItor ${panel.short}`, lang: 'tr', dir: 'ltr',
-    start_url: `/${panel.slug}`, scope: '/', display: 'standalone', orientation: 'any',
+    start_url: { ogretmen: '/yonetim', ogrenci: '/ogrenci', veli: '/veli' }[panel.slug], scope: '/', display: 'standalone', orientation: 'any',
     background_color: '#F7EFE2', theme_color: '#810000',
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -93,7 +93,36 @@ ${swRegister}
       { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   }, null, 2));
-  console.log(`✓ ${panel.slug}.html  ${(html.length / 1048576).toFixed(2)} MB`);
+  console.log(`✓ demo/${panel.slug}.html  ${(html.length / 1048576).toFixed(2)} MB`);
+}
+
+// Panel dışı sayfalar için etkinlik görüntüleyici paketleri (yönetim, öğrenci, veli).
+{
+  const core = read('js/04-core.js');
+  const icBlock = core.match(/const IC=\{[\s\S]*?\n\};/);
+  const icFn = core.match(/const ic=.*\n/);
+  if (!icBlock || !icFn) throw new Error('04-core.js içinde simge tanımları bulunamadı');
+  const ob = read('js/26-onboard.js').split('\n');
+  const obData = ob.slice(1, 26).join('\n'); // OB_Q, OB_INTRO, OB_END, isOther (26-onboard.js 2–26. satırlar)
+  const emoji = ob.slice(64, 72).join('\n'); // stuEmoji()
+  if (!/^const OB_Q=/.test(obData) || !/^function stuEmoji/.test(emoji)) throw new Error('26-onboard.js yapısı değişmiş; kit-gorsel satır aralıklarını güncelleyin');
+  const kit = [read('kit/kit-pre.js'), icBlock[0], icFn[0], read('js/24-vis.js'), obData, emoji, read('kit/kit-post.js')].join('\n');
+  new vm.Script(kit, { filename: 'kit-gorsel.js' });
+  mkdirSync(join(OUT, 'app'), { recursive: true });
+  writeFileSync(join(OUT, 'app', 'kit-gorsel.js'), kit);
+  const resmi = read('js/21-resmi.js').split('\n').filter((l) => /^const (RESMI|RESMI_META|UNIT_WORD)=/.test(l)).join('\n');
+  const lib = [resmi, read('js/25-b21.js'), read('js/25-lib-data.js'), 'window.RESMI=RESMI;window.UNIT_WORD=UNIT_WORD;window.ACTLIB=ACTLIB;'].join('\n');
+  new vm.Script(lib, { filename: 'kit-kutuphane.js' });
+  writeFileSync(join(OUT, 'app', 'kit-kutuphane.js'), lib);
+  const navi = read('js/12-navi-assets.js');
+  const poses = {};
+  for (const m of navi.matchAll(/"(happy|excited|thinking|thumbs|point|wink)": "(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+)"/g)) poses[m[1]] = m[2];
+  if (Object.keys(poses).length < 6) throw new Error('Navi görselleri bulunamadı');
+  writeFileSync(join(OUT, 'app', 'navi.js'), `window.NAVI=${JSON.stringify(poses)};`);
+  const css = read('html/lib.html').replace(/<\/?style>/g, '') + '\n' + read('kit/kit.css');
+  writeFileSync(join(OUT, 'app', 'etkinlik.css'), css);
+  hash.update(kit); hash.update(lib); hash.update(css);
+  console.log(`✓ app/kit-gorsel.js ${(kit.length / 1024).toFixed(0)} KB · app/kit-kutuphane.js ${(lib.length / 1024).toFixed(0)} KB`);
 }
 
 // Hizmet çalışanı: önbellek sürümü içerikten türetilir, her yeni derlemede eski önbellek temizlenir.

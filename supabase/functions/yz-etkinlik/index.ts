@@ -74,13 +74,17 @@ ${VISUALS}
 
 Sonucu MUTLAKA "etkinlik_kaydet" aracını bir kez çağırarak döndür; ayrıca düz metin yazma.`;
 
+const VIS_TYPES = ['flow', 'organizer', 'sort', 'cards', 'chat', 'news', 'timeline', 'routine', 'bars', 'pie', 'budget',
+  'pizza', 'balance', 'numberline', 'areagrid', 'cubes', 'coord', 'dice', 'zoom', 'solar', 'circuit', 'heat', 'light', 'force',
+  'atom', 'lever', 'shapes'];
+
 const TOOL = {
   name: 'etkinlik_kaydet',
   description: 'Tasarlanan etkinliği NavigAItor etkinlik biçiminde kaydeder.',
   input_schema: {
     type: 'object',
-    required: ['title', 'subtitle', 'scenario', 'kazanim', 'skills21', 'digital', 'tools', 'visual', 'steps',
-      'checklist', 'navi', 'rubric', 'diff', 'misconception'],
+    required: ['title', 'subtitle', 'scenario', 'kazanim', 'skills21', 'digital', 'tools', 'visual_type', 'visual_params',
+      'visual_caption', 'steps', 'checklist', 'navi', 'rubric', 'diff_destek', 'diff_ileri', 'misconception'],
     properties: {
       title: { type: 'string', description: 'Merak uyandıran kısa başlık' },
       subtitle: { type: 'string', description: 'Konu ve yöntem, tek satır' },
@@ -89,16 +93,9 @@ const TOOL = {
       skills21: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 5 },
       digital: { type: 'array', items: { type: 'string' }, maxItems: 3 },
       tools: { type: 'array', items: { type: 'string' }, maxItems: 4 },
-      visual: {
-        type: 'object', required: ['type', 'params', 'caption'],
-        properties: {
-          type: { type: 'string', enum: ['flow', 'organizer', 'sort', 'cards', 'chat', 'news', 'timeline', 'routine', 'bars',
-            'pie', 'budget', 'pizza', 'balance', 'numberline', 'areagrid', 'cubes', 'coord', 'dice', 'zoom', 'solar',
-            'circuit', 'heat', 'light', 'force', 'atom', 'lever', 'shapes'] },
-          params: { type: 'object' },
-          caption: { type: 'string', description: 'Öğrencinin görselle ne yapacağı, tek cümle' },
-        },
-      },
+      visual_type: { type: 'string', enum: VIS_TYPES, description: 'Görsel türü (listeden)' },
+      visual_params: { type: 'object', description: 'Seçilen görsel türünün parametreleri (sistem isteminde verilen biçimde)' },
+      visual_caption: { type: 'string', description: 'Öğrencinin görselle ne yapacağı, tek cümle' },
       steps: {
         type: 'array', minItems: 3, maxItems: 6,
         items: {
@@ -123,14 +120,40 @@ const TOOL = {
           },
         },
       },
-      diff: {
-        type: 'object', required: ['destek', 'ileri'],
-        properties: { destek: { type: 'string' }, ileri: { type: 'string' } },
-      },
+      diff_destek: { type: 'string', description: 'Desteğe ihtiyaç duyan öğrenci için uyarlama' },
+      diff_ileri: { type: 'string', description: 'İleri düzey öğrenci için uzatma' },
       misconception: { type: 'string', description: 'Hedeflenen yanılgı ve etkinliğin onu nasıl ortaya çıkardığı' },
     },
   },
 };
+
+// Model çıktısını arayüzün beklediği biçime getirir; eksik veya bozuk alanları güvenli varsayılanlarla doldurur.
+type Obj = Record<string, unknown>;
+const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+const strs = (v: unknown, max = 8) => (Array.isArray(v) ? v.map(str).filter(Boolean).slice(0, max) : typeof v === 'string' && v.trim() ? [v.trim()] : []);
+const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
+function normalize(d: Obj) {
+  const v = isObj(d.visual) ? d.visual : {};
+  let vType = str(d.visual_type) || str(v.type) || (typeof d.visual === 'string' ? d.visual : '');
+  vType = VIS_TYPES.find((t) => new RegExp(`\\b${t}\\b`).test(vType)) ?? 'flow';
+  const vParams = isObj(d.visual_params) ? d.visual_params : isObj(v.params) ? v.params : isObj(d.params) ? d.params : {};
+  const vCaption = str(d.visual_caption) || str(v.caption) || str(d.caption);
+  const diff = isObj(d.diff) ? d.diff : {};
+  const steps = (Array.isArray(d.steps) ? d.steps : []).filter(isObj).map((x) => ({
+    title: str(x.title) || 'Adım', mode: str(x.mode), items: strs(x.items, 6), warn: str(x.warn),
+  })).filter((x) => x.items.length).slice(0, 6);
+  const rubric = (Array.isArray(d.rubric) ? d.rubric : []).filter(isObj).map((x) => ({
+    k: str(x.k), d: str(x.d), l4: str(x.l4), l3: str(x.l3), l2: str(x.l2), l1: str(x.l1),
+  })).filter((x) => x.k).slice(0, 4);
+  return {
+    title: str(d.title), subtitle: str(d.subtitle), scenario: str(d.scenario),
+    kazanim: strs(d.kazanim, 3), skills21: strs(d.skills21, 5), digital: strs(d.digital, 3), tools: strs(d.tools, 4),
+    visual: { type: vType, params: vParams, caption: vCaption },
+    steps, checklist: strs(d.checklist, 8), navi: strs(d.navi, 4), rubric,
+    diff: { destek: str(d.diff_destek) || str(diff.destek), ileri: str(d.diff_ileri) || str(diff.ileri) },
+    misconception: str(d.misconception),
+  };
+}
 
 const CODE_RE = /\b(MAT|TUR|FEN|SOS|ING|FB|SB|ENG|T)\.?\s?\d+(\.\d+){1,3}\b/g;
 const stripCodes = (v: unknown): unknown =>
@@ -221,13 +244,14 @@ Deno.serve(async (req) => {
     const m = txt.match(/\{[\s\S]*\}/);
     try { draft = m ? JSON.parse(m[0]) : undefined; } catch { draft = undefined; }
   }
-  const missing = TOOL.input_schema.required.filter((k) => !draft || draft[k] == null);
-  if (!draft || missing.length > 2) {
+  const norm = draft ? normalize(draft) : null;
+  const missing = norm ? (['title', 'scenario', 'steps', 'checklist'] as const).filter((k) => !norm[k] || (Array.isArray(norm[k]) && !norm[k].length)) : ['tümü'];
+  if (!norm || missing.length) {
     await admin.from('ai_generations').update({ status: 'error', error: 'eksik çıktı: ' + missing.join(',') }).eq('id', row?.id);
     return fail('Taslak eksik üretildi. Yeniden deneyin.', 502);
   }
   const activity = stripCodes({
-    ...draft,
+    ...norm,
     course, grade, duration: req_.duration, format: req_.format, themeName: req_.unit,
     aiLevel: level, aiNote: req_.note, src: 'AI', model: MODEL,
   }) as Record<string, unknown>;

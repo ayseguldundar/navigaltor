@@ -1,6 +1,7 @@
 // Öğretmen / okul yöneticisi konsolu: şubeler, öğrenci listesi ve PIN kartları, veli davetleri, öğretmen davetleri, yapay zekâ kayıtları.
-import { supabase, rpc, currentProfile, signOut, ROLE_TR, esc } from './supa.js';
+import { supabase, rpc, callFn, currentProfile, signOut, ROLE_TR, esc, changePasswordDialog } from './supa.js';
 import { parseRoster } from './liste.js';
+import { createEtkinlik } from './yonetim-etkinlik.js';
 
 const COURSE = { GENEL: 'Genel / Sınıf rehberliği', MAT: 'Matematik', TUR: 'Türkçe', FEN: 'Fen Bilimleri', SOS: 'Sosyal Bilgiler', ING: 'İngilizce' };
 const app = document.getElementById('app');
@@ -17,11 +18,17 @@ S.me = me;
 const isAdmin = me.role === 'admin';
 document.getElementById('who').innerHTML = `<span class="av">${esc(me.full_name.split(' ').map((p) => p[0]).join('').slice(0, 2))}</span>
   <span><b>${esc(me.full_name)}</b><small>${ROLE_TR[me.role]}</small></span>
-  <a class="btn sm" href="/ogretmen">Öğretmen paneli</a><button class="btn sm" id="out">Çıkış</button>`;
+  <a class="btn sm" href="/demo/ogretmen" title="Kurgusal verilerle tanıtım paneli">Demo</a><button class="btn sm" id="pwd">Şifre</button><button class="btn sm" id="out">Çıkış</button>`;
 document.getElementById('out').onclick = () => signOut('/giris');
+document.getElementById('pwd').onclick = () => changePasswordDialog(dlg, dlgBody);
 
 const msg = () => (S.msg ? `<div class="msg ${S.msg.k}" role="status">${esc(S.msg.t)}</div>` : '');
 const flash = (k, t) => { S.msg = { k, t }; draw(); setTimeout(() => { if (S.msg && S.msg.t === t) { S.msg = null; draw(); } }, 5000); };
+
+const E = createEtkinlik({
+  S, openDlg: (h) => openDlg(h), dlg, dlgBody, flash: (k, t) => flash(k, t), draw: () => draw(), msg: () => msg(),
+  ensureStudents: async (force) => { if (force || S.studentsSec !== S.sec) await loadStudents(); },
+});
 
 async function loadCtx() {
   S.ctx = await rpc('my_context');
@@ -29,6 +36,7 @@ async function loadCtx() {
   if (!S.sec && S.ctx.sections.length) S.sec = S.ctx.sections[0].id;
 }
 async function loadStudents() {
+  S.studentsSec = S.sec;
   if (!S.sec) { S.students = []; return; }
   const [st, g, inv] = await Promise.all([
     supabase.from('students').select('id, first_name, last_name, student_no, active, auth_user_id').eq('section_id', S.sec).order('student_no', { nullsFirst: false }).order('first_name'),
@@ -43,18 +51,14 @@ async function loadStudents() {
 }
 async function loadSchool() {
   const [t, i] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'teacher']).order('full_name'),
+    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'teacher', 'parent']).order('full_name'),
     supabase.from('invites').select('code, expires_at, created_at').eq('kind', 'teacher').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
   ]);
-  S.teachers = t.data || []; S.tinv = i.data || [];
-}
-async function loadGens() {
-  const { data } = await supabase.from('ai_generations').select('id, created_at, status, model, input_tokens, output_tokens, request, response').order('created_at', { ascending: false }).limit(30);
-  S.gens = data || [];
+  S.teachers = (t.data || []).filter((x) => x.role !== 'parent'); S.parents = (t.data || []).filter((x) => x.role === 'parent'); S.tinv = i.data || [];
 }
 
 const tabs = () => `<div class="tabs" role="tablist" style="margin-bottom:16px">${[
-  ['subeler', 'Şubelerim'], ['ogrenciler', 'Öğrenciler'], ...(isAdmin ? [['okul', 'Okul ve öğretmenler']] : []), ['yz', 'Yapay zekâ'],
+  ['subeler', 'Şubelerim'], ['ogrenciler', 'Öğrenciler'], ['etkinlik', 'Etkinlikler'], ...(isAdmin ? [['okul', 'Okul ve öğretmenler']] : []),
 ].map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>`;
 
 function viewSections() {
@@ -80,10 +84,10 @@ function viewStudents() {
     <div class="row" style="margin-bottom:10px"><b>${esc(sec.name)}</b><span class="chip">Sınıf kodu: <span class="code">${esc(sec.class_code)}</span></span><span class="sp"></span>
       ${S.students.length ? '<button class="btn sm" data-act="printAll">PIN kartlarını yazdır</button>' : ''}</div>
     ${S.students.length ? `<div class="tw"><table class="t"><thead><tr><th>No</th><th>Ad soyad</th><th>Giriş</th><th>Veli</th><th></th></tr></thead><tbody>
-      ${S.students.map((s) => `<tr style="${s.active ? '' : 'opacity:.5'}"><td>${esc(s.student_no || '—')}</td><td><b>${esc(s.first_name)} ${esc(s.last_name)}</b>${s.active ? '' : ' <span class="chip">pasif</span>'}</td>
+      ${S.students.map((s) => `<tr style="${s.active ? '' : 'opacity:.5'}"><td>${esc(s.student_no || '—')}</td><td><button class="linkb" data-stu="${s.id}"><b>${esc(s.first_name)} ${esc(s.last_name)}</b></button>${s.active ? '' : ' <span class="chip">pasif</span>'}</td>
         <td>${s.auth_user_id ? '<span class="tag-ok">✓ giriş yaptı</span>' : '<span class="tag-no">henüz yok</span>'}</td>
         <td>${S.guardians.has(s.id) ? '<span class="tag-ok">✓ bağlı</span>' : S.invites[s.id] ? `<span class="code inv">${S.invites[s.id]}</span>` : `<button class="btn sm" data-pinv="${s.id}">Davet kodu üret</button>`}</td>
-        <td style="white-space:nowrap"><button class="btn sm" data-pin="${s.id}">Yeni PIN</button> <button class="btn sm" data-tog="${s.id}">${s.active ? 'Pasif yap' : 'Etkinleştir'}</button></td></tr>`).join('')}
+        <td style="white-space:nowrap"><button class="btn sm" data-pin="${s.id}">Yeni PIN</button> <button class="btn sm" data-tog="${s.id}">${s.active ? 'Pasif yap' : 'Etkinleştir'}</button>${isAdmin ? ` <button class="btn sm" data-sdel="${s.id}" title="KVKK: öğrencinin tüm verisini kalıcı olarak sil">Sil</button>` : ''}</td></tr>`).join('')}
     </tbody></table></div>
     <p class="small muted">PIN'ler güvenlik için saklanmaz; yalnızca üretildiği anda gösterilir. Unutulan PIN için “Yeni PIN” kullanın. Veli davet kodu tek kullanımlıktır ve 30 gün geçerlidir.</p>`
     : `<div class="empty"><div class="big">🎒</div><p class="muted">Bu şubede öğrenci yok. Listeyi Excel'den kopyalayıp yapıştırabilirsiniz.</p><button class="btn pri" data-act="import">+ Öğrenci ekle</button></div>`}
@@ -105,27 +109,17 @@ function viewSchool() {
         <label class="row small" style="margin-bottom:12px"><input type="checkbox" name="guidance"> Bu şubenin rehber öğretmeni</label>
         <button class="btn pri">Ata</button></form>` : '<p class="muted small">Önce şube açın ve öğretmen davet edin.</p>'}</div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>Okuldaki öğretmenler</h3><div class="tw"><table class="t"><thead><tr><th>Ad soyad</th><th>Rol</th></tr></thead><tbody>
-    ${S.teachers.map((t) => `<tr><td>${esc(t.full_name)}</td><td>${ROLE_TR[t.role]}</td></tr>`).join('')}</tbody></table></div></div>`;
-}
-
-function viewAI() {
-  const ok = S.gens.filter((g) => g.status === 'ok');
-  const tok = ok.reduce((a, g) => a + (g.input_tokens || 0) + (g.output_tokens || 0), 0);
-  return `<div class="hero"><h1>Yapay zekâ ile etkinlik</h1><span class="sp"></span><a class="btn pri" href="/ogretmen#activities/yeni">Etkinlik üret →</a></div>
-  <div class="card"><p>Öğretmen panelinde <b>Etkinlikler → Yeni Etkinlik Oluştur → Yapay zekâdan iste</b> yolunu kullanın. Giriş yaptığınız için taslaklar gerçek yapay zekâ (Claude) ile, seçtiğiniz kazanım ve öğrenci düzeyine göre özgün olarak üretilir.</p>
-    <ul class="small muted"><li>Öğrenci adı veya kimliği yapay zekâya gönderilmez.</li><li>Kazanım kodları çıktıdan otomatik temizlenir.</li><li>Taslak, siz onaylamadan öğrenciye gitmez.</li></ul></div>
-  <div class="card" style="margin-top:14px"><div class="row"><h3>Son üretimler</h3><span class="sp"></span><span class="chip">${ok.length} başarılı · ${tok.toLocaleString('tr-TR')} token</span></div>
-  ${S.gens.length ? `<div class="tw"><table class="t"><thead><tr><th>Tarih</th><th>Ders</th><th>Başlık</th><th>Durum</th><th>Token</th></tr></thead><tbody>
-    ${S.gens.map((g) => `<tr><td class="small">${new Date(g.created_at).toLocaleString('tr-TR')}</td><td>${esc(COURSE[g.request?.course] || '')} ${g.request?.grade || ''}</td>
-      <td>${esc(g.response?.title || '—')}</td><td>${g.status === 'ok' ? '<span class="tag-ok">✓</span>' : g.status === 'error' ? '<span style="color:var(--err)">hata</span>' : '…'}</td>
-      <td class="small">${(g.input_tokens || 0) + (g.output_tokens || 0) || '—'}</td></tr>`).join('')}</tbody></table></div>`
-    : '<p class="muted small">Henüz üretim yok.</p>'}</div>`;
+  <div class="card" style="margin-top:14px"><h3>Okuldaki öğretmenler</h3><div class="tw"><table class="t"><thead><tr><th>Ad soyad</th><th>Rol</th><th></th></tr></thead><tbody>
+    ${S.teachers.map((t) => `<tr><td>${esc(t.full_name)}</td><td>${ROLE_TR[t.role]}</td><td style="text-align:right">${t.id === S.me.id ? '<span class="small muted">siz</span>' : `<button class="btn sm" data-pwd="${t.id}">Şifre sıfırla</button>`}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card" style="margin-top:14px"><h3>Veli hesapları</h3>
+    ${(S.parents || []).length ? `<div class="tw"><table class="t"><thead><tr><th>Ad soyad</th><th></th></tr></thead><tbody>
+    ${S.parents.map((t) => `<tr><td>${esc(t.full_name)}</td><td style="text-align:right"><button class="btn sm" data-pwd="${t.id}">Şifre sıfırla</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Henüz veli hesabı yok. Veliler, öğrenci listesinde ürettiğiniz davet koduyla kaydolur.</p>'}
+    <p class="small muted">Şifresini unutan öğretmen veya veli için geçici şifre üretin ve kişiye güvenli bir yoldan iletin. Kişi giriş yaptıktan sonra şifresini değiştirebilir. Öğrenciler için öğrenci listesindeki “Yeni PIN” kullanılır.</p></div>`;
 }
 
 function draw() {
   if (!S.ctx) return;
-  const v = { subeler: viewSections, ogrenciler: viewStudents, okul: viewSchool, yz: viewAI }[S.tab] || viewSections;
+  const v = { subeler: viewSections, ogrenciler: viewStudents, okul: viewSchool, etkinlik: E.view }[S.tab] || viewSections;
   app.innerHTML = tabs() + v();
   app.querySelector('#assign')?.addEventListener('submit', onAssign);
 }
@@ -136,7 +130,7 @@ async function go(tab) {
   try {
     if (tab === 'ogrenciler') await loadStudents();
     if (tab === 'okul') await loadSchool();
-    if (tab === 'yz') await loadGens();
+    if (tab === 'etkinlik') await E.load();
   } catch (e) { S.msg = { k: 'err', t: e.message }; }
   draw();
 }
@@ -147,6 +141,10 @@ app.addEventListener('click', async (e) => {
   if (!b) return;
   const d = b.dataset;
   try {
+    if (S.tab === 'etkinlik' && !d.tab && await E.onClick(e, b)) return;
+    if (d.stu) { studentDialog(d.stu); return; }
+    if (d.sdel) { deleteStudentDialog(d.sdel); return; }
+    if (d.pwd) { resetPasswordDialog(d.pwd); return; }
     if (d.tab) { e.preventDefault(); await go(d.tab); }
     else if (d.copy) { await navigator.clipboard.writeText(d.copy).catch(() => {}); flash('ok', `“${d.copy}” kopyalandı.`); }
     else if (d.open) { S.sec = d.open; await go('ogrenciler'); }
@@ -168,7 +166,9 @@ app.addEventListener('click', async (e) => {
     }
   } catch (err) { flash('err', err.message); }
 });
+app.addEventListener('input', (e) => { if (S.tab === 'etkinlik') E.onInput(e); });
 app.addEventListener('change', async (e) => {
+  if (S.tab === 'etkinlik') { try { if (await E.onChange(e)) return; } catch (err) { flash('err', err.message); return; } }
   if (e.target.dataset.chg === 'sec') { S.sec = e.target.value; await go('ogrenciler'); }
 });
 
@@ -253,11 +253,72 @@ function printCards(list, noPins) {
   });
 }
 
+async function studentDialog(id) {
+  const s = S.students.find((x) => x.id === id);
+  openDlg(`<h2>${esc(s.first_name)} ${esc(s.last_name)}</h2><p class="muted small">Yükleniyor…</p>`);
+  const [ir, as, sb] = await Promise.all([
+    supabase.from('intake_responses').select('answers, completed, updated_at').eq('student_id', id).maybeSingle(),
+    supabase.from('assignments').select('id, title, course, due_date, activity').eq('section_id', S.sec).eq('archived', false).order('created_at', { ascending: false }),
+    supabase.from('submissions').select('assignment_id, status, checklist, completed_at, reflection').eq('student_id', id),
+  ]);
+  const ozet = ir.data ? window.tanismaOzet(ir.data.answers).filter((x) => x.a) : [];
+  const skills = {};
+  (as.data || []).forEach((a) => { const x = (sb.data || []).find((y) => y.assignment_id === a.id); if (x && x.status === 'tamamlandi') (a.activity.skills21 || []).forEach((k) => { skills[k] = (skills[k] || 0) + 1; }); });
+  const done = (sb.data || []).filter((x) => x.status === 'tamamlandi').length;
+  dlgBody.innerHTML = `<h2>${esc(s.first_name)} ${esc(s.last_name)}</h2>
+    <p class="small muted">${s.student_no ? 'No ' + esc(s.student_no) + ' · ' : ''}${s.auth_user_id ? 'Sisteme giriş yaptı' : 'Henüz giriş yapmadı'} · Veli: ${S.guardians.has(s.id) ? 'bağlı' : 'bağlı değil'}</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:12px 0"><div class="card"><div class="small muted">Atanan etkinlik</div><b style="font-size:24px">${(as.data || []).length}</b></div>
+      <div class="card"><div class="small muted">Tamamlanan</div><b style="font-size:24px">${done}</b></div></div>
+    <h3>Çalıştığı 21. yüzyıl becerileri</h3><p class="small">${Object.keys(skills).length ? Object.entries(skills).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip">${esc(k)} · ${n}</span>`).join(' ') : '<span class="muted">Henüz tamamlanan etkinlik yok.</span>'}</p>
+    <h3 style="margin-top:12px">Etkinlikler</h3><div class="tw"><table class="t"><tbody>${(as.data || []).map((a) => { const x = (sb.data || []).find((y) => y.assignment_id === a.id);
+      return `<tr><td>${esc(a.title)}</td><td>${x ? (x.status === 'tamamlandi' ? '<span class="tag-ok">Tamamladı</span>' : '<span class="tag-mid">Devam ediyor</span>') : '<span class="tag-no">Başlamadı</span>'}</td><td class="small">${x && x.reflection ? esc(x.reflection) : ''}</td></tr>`; }).join('') || '<tr><td class="muted">Atama yok.</td></tr>'}</tbody></table></div>
+    <h3 style="margin-top:12px">Navi tanışma formu</h3>${ozet.length ? `<div class="ozet">${ozet.map((x) => `<div><span>${esc(x.q)}</span><b>${esc(x.a)}</b></div>`).join('')}</div>` : '<p class="small muted">Öğrenci formu henüz doldurmadı.</p>'}
+    <div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn" data-close>Kapat</button></div>`;
+}
+
+function deleteStudentDialog(id) {
+  const s = S.students.find((x) => x.id === id);
+  openDlg(`<h2>Öğrenci verisini kalıcı olarak sil</h2>
+    <p><b>${esc(s.first_name)} ${esc(s.last_name)}</b> için tüm kayıtlar silinir: giriş hesabı, etkinlik teslimleri, tanışma formu, veli bağlantısı ve onay kayıtları. Bu işlem geri alınamaz.</p>
+    <p class="small muted">KVKK kapsamında veli talebiyle ya da öğrencinin okuldan ayrılmasıyla kullanılır. Yalnızca öğrenciyi geçici olarak kapatmak için “Pasif yap” yeterlidir.</p>
+    <div class="fld"><label for="cfm">Onaylamak için öğrencinin adını yazın: <b>${esc(s.first_name)}</b></label><input class="in" id="cfm" autocomplete="off"></div><div id="delMsg"></div>
+    <div class="row"><span class="sp"></span><button class="btn" data-close>Vazgeç</button><button class="btn pri" id="delGo" disabled>Kalıcı olarak sil</button></div>`);
+  const inp = dlgBody.querySelector('#cfm'), go = dlgBody.querySelector('#delGo');
+  inp.addEventListener('input', () => { go.disabled = inp.value.trim().toLocaleLowerCase('tr') !== s.first_name.toLocaleLowerCase('tr'); });
+  go.addEventListener('click', async () => {
+    go.disabled = true; go.innerHTML = '<span class="spinner"></span> Siliniyor…';
+    try {
+      await callFn('veri-sil', { studentId: id }, { auth: true });
+      dlg.close(); await loadStudents(); await loadCtx(); flash('ok', 'Öğrencinin tüm verisi silindi.');
+    } catch (err) { dlgBody.querySelector('#delMsg').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; go.disabled = false; go.textContent = 'Kalıcı olarak sil'; }
+  });
+}
+
+function resetPasswordDialog(id) {
+  const p = [...S.teachers, ...(S.parents || [])].find((x) => x.id === id);
+  openDlg(`<h2>Geçici şifre üret</h2><p><b>${esc(p.full_name)}</b> (${ROLE_TR[p.role]}) için yeni bir geçici şifre üretilecek. Eski şifre geçersiz olur ve açık oturumları kapanır.</p>
+    <div id="pwMsg"></div><div class="row"><span class="sp"></span><button class="btn" data-close>Vazgeç</button><button class="btn pri" id="pwGo">Geçici şifre üret</button></div>`);
+  const go = dlgBody.querySelector('#pwGo');
+  go.addEventListener('click', async () => {
+    go.disabled = true; go.innerHTML = '<span class="spinner"></span> Üretiliyor…';
+    try {
+      const r = await callFn('sifre-sifirla', { userId: id }, { auth: true });
+      dlgBody.innerHTML = `<h2>Geçici şifre hazır</h2><p><b>${esc(p.full_name)}</b> bu şifreyle giriş yapabilir:</p>
+        <div class="row"><span class="code cc" style="font-size:22px;color:var(--brand)">${esc(r.password)}</span><button class="btn sm" data-copy="${esc(r.password)}">Kopyala</button></div>
+        <p class="small muted">Şifre yalnızca şimdi görünür ve saklanmaz. Kişiye yüz yüze ya da güvenli bir kanaldan iletin.</p>
+        <div class="row"><span class="sp"></span><button class="btn pri" data-close>Tamam</button></div>`;
+      dlgBody.querySelector('[data-copy]').addEventListener('click', (e) => navigator.clipboard.writeText(e.target.dataset.copy).catch(() => {}));
+    } catch (err) { dlgBody.querySelector('#pwMsg').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; go.disabled = false; go.textContent = 'Geçici şifre üret'; }
+  });
+}
+
 // ---------------------------------------------------------------- başlat
 try {
   await loadCtx();
   const h = location.hash.replace('#', '');
-  await go(['subeler', 'ogrenciler', 'okul', 'yz'].includes(h) && (h !== 'okul' || isAdmin) ? h : 'subeler');
+  const valid = (x) => ['subeler', 'ogrenciler', 'okul', 'etkinlik'].includes(x) && (x !== 'okul' || isAdmin);
+  await go(valid(h) ? h : 'subeler');
+  addEventListener('hashchange', () => { const x = location.hash.replace('#', ''); if (valid(x) && x !== S.tab) go(x); });
 } catch (err) {
   app.innerHTML = `<div class="card"><div class="msg err">${esc(err.message)}</div></div>`;
 }

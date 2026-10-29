@@ -47,3 +47,21 @@ export async function signOut(to = '/giris') {
 }
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Öğretmen ve veli için şifre değiştirme penceresi (öğrenciler PIN kullanır).
+export function changePasswordDialog(dlg, body) {
+  body.innerHTML = `<h2>Şifremi değiştir</h2>
+    <form id="cpw"><div class="fld"><label for="np1">Yeni şifre (en az 8 karakter)</label><input class="in" id="np1" type="password" minlength="8" autocomplete="new-password" required></div>
+    <div class="fld"><label for="np2">Yeni şifre (tekrar)</label><input class="in" id="np2" type="password" minlength="8" autocomplete="new-password" required></div>
+    <div id="cpwMsg"></div><div class="row"><span class="sp"></span><button type="button" class="btn" data-close>Vazgeç</button><button class="btn pri">Kaydet</button></div></form>`;
+  dlg.showModal();
+  body.querySelector('#cpw').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const a = body.querySelector('#np1').value, b = body.querySelector('#np2').value;
+    const out = body.querySelector('#cpwMsg');
+    if (a !== b) { out.innerHTML = '<div class="msg err">Şifreler aynı değil.</div>'; return; }
+    const { error } = await supabase.auth.updateUser({ password: a });
+    if (error) { out.innerHTML = `<div class="msg err">${esc(/weak|short|least/i.test(error.message) ? 'Şifre çok kısa veya zayıf.' : /different|same/i.test(error.message) ? 'Yeni şifre eskisiyle aynı olamaz.' : error.message)}</div>`; return; }
+    body.innerHTML = '<h2>Şifreniz değiştirildi</h2><p class="muted">Bir sonraki girişte yeni şifrenizi kullanın.</p><div class="row"><span class="sp"></span><button class="btn pri" data-close>Tamam</button></div>';
+  });
+}

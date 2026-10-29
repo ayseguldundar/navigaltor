@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <link rel="stylesheet" href="/app/ortak.css">
+<link rel="stylesheet" href="/app/etkinlik.css">
 <style>
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .who{display:flex;align-items:center;gap:10px;margin-left:auto}
@@ -31,8 +32,17 @@
 .inv{font-size:15px;color:var(--brand)}
 @media print{body{background:#fff}.wrap>*:not(#printArea){display:none!important}#printArea{display:block!important}.pin-card{border-color:#999}}
 #printArea{display:none}
+.as-card{display:flex;flex-direction:column;gap:8px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.as-card h3{font-size:19px}.as-card:hover{border-color:#D8C8B0}
+.bar{height:8px;border-radius:8px;background:#F0E6D8;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);border-radius:8px}
+.tag-mid{color:#9A6B00;font-weight:800}
+.linkb{background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}.linkb:hover b{text-decoration:underline;color:var(--brand)}
+input.fb{min-width:160px;padding:7px 10px}
+.ozet{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ozet>div{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;background:#FFFCF8;border:1px solid #F0E6D8}.ozet span{font-size:12px;color:var(--muted)}.ozet b{font-size:13.5px}
+@media (max-width:640px){.ozet{grid-template-columns:1fr}}
 </style>
 <script src="/config.js"></script>
+<script src="/app/kit-gorsel.js"></script>
 </head>
 <body>
 <div class="wrap">
