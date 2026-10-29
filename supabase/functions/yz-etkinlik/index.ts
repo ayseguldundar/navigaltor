@@ -129,20 +129,37 @@ const TOOL = {
 
 // Model çıktısını arayüzün beklediği biçime getirir; eksik veya bozuk alanları güvenli varsayılanlarla doldurur.
 type Obj = Record<string, unknown>;
-const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-const strs = (v: unknown, max = 8) => (Array.isArray(v) ? v.map(str).filter(Boolean).slice(0, max) : typeof v === 'string' && v.trim() ? [v.trim()] : []);
+// Model bazen dizi alanlarını JSON metni olarak ('["…"]') ya da metin alanlarını dizi olarak döndürür; ikisini de düzelt.
+const unJson = (v: unknown): unknown => {
+  if (typeof v !== 'string') return v;
+  const t = v.trim();
+  if (!/^[[{]/.test(t)) return t;
+  try { return JSON.parse(t); } catch { return t; }
+};
+const str = (v: unknown): string => {
+  const u = unJson(v);
+  if (typeof u === 'string') return u.trim();
+  if (Array.isArray(u)) return u.map(str).filter(Boolean).join(' ');
+  return '';
+};
+const strs = (v: unknown, max = 8): string[] => {
+  const u = unJson(v);
+  return Array.isArray(u) ? u.map(str).filter(Boolean).slice(0, max) : typeof u === 'string' && u.trim() ? [u.trim()] : [];
+};
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 function normalize(d: Obj) {
   const v = isObj(d.visual) ? d.visual : {};
   let vType = str(d.visual_type) || str(v.type) || (typeof d.visual === 'string' ? d.visual : '');
   vType = VIS_TYPES.find((t) => new RegExp(`\\b${t}\\b`).test(vType)) ?? 'flow';
-  const vParams = isObj(d.visual_params) ? d.visual_params : isObj(v.params) ? v.params : isObj(d.params) ? d.params : {};
+  const vp = unJson(d.visual_params);
+  const vParams = isObj(vp) ? vp : isObj(v.params) ? v.params : isObj(d.params) ? d.params : {};
   const vCaption = str(d.visual_caption) || str(v.caption) || str(d.caption);
   const diff = isObj(d.diff) ? d.diff : {};
-  const steps = (Array.isArray(d.steps) ? d.steps : []).filter(isObj).map((x) => ({
+  const arr = (v: unknown) => { const u = unJson(v); return Array.isArray(u) ? u : []; };
+  const steps = arr(d.steps).filter(isObj).map((x) => ({
     title: str(x.title) || 'Adım', mode: str(x.mode), items: strs(x.items, 6), warn: str(x.warn),
   })).filter((x) => x.items.length).slice(0, 6);
-  const rubric = (Array.isArray(d.rubric) ? d.rubric : []).filter(isObj).map((x) => ({
+  const rubric = arr(d.rubric).filter(isObj).map((x) => ({
     k: str(x.k), d: str(x.d), l4: str(x.l4), l3: str(x.l3), l2: str(x.l2), l1: str(x.l1),
   })).filter((x) => x.k).slice(0, 4);
   return {
