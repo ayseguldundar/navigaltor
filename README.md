@@ -13,14 +13,15 @@
 | Giriş (öğretmen, öğrenci, veli) | `/giris` |
 | Yönetim (şubeler, öğrenciler, davetler) | `/yonetim` |
 
-> **Faz 1 canlıda:** hesaplar, roller, sınıf kodu + PIN ile öğrenci girişi ve Claude ile etkinlik üretimi Supabase üzerinde çalışıyor ([docs/FAZ1.md](docs/FAZ1.md)). Panellerin içeriği hâlâ demo verisidir; taşınma planı: [docs/YOL-HARITASI.md](docs/YOL-HARITASI.md)
+> **Pilot branch durumu:** hesaplar, roller, sınıf kodu + PIN ile öğrenci girişi, atama/teslim akışı ve Claude etkinlik üretimi Supabase üzerinde çalışacak şekilde kodlanmıştır. `/demo` kurgusal veridir; gerçek pilot akışı `/giris`, `/yonetim`, `/ogrenci` ve `/veli` rotalarındadır. Canlı migration ve Edge Function sürümleri branch ile ayrıca karşılaştırılmalıdır: [docs/PILOT-HAZIRLIK-RAPORU.md](docs/PILOT-HAZIRLIK-RAPORU.md)
 
 ## Geliştirme
 
 ```bash
 npm run build      # src/ → dist/ (bağımlılık gerekmez, Node 18+)
 npm run serve      # http://localhost:4173 adresinde önizleme
-npm i && npx playwright install chromium
+npm ci && npx playwright install --with-deps chromium
+npm run check      # statik güvenlik ve repo bütünlüğü kontrolleri
 npm test           # derler ve uçtan uca testleri çalıştırır
 ```
 
