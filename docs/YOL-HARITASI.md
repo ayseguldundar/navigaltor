@@ -1,6 +1,6 @@
 # NavigAItor — Demodan gerçek web uygulamasına yol haritası
 
-_Son güncelleme: 29 Ekim 2026 — Faz 1 canlıda, Faz 3'ün yapay zekâ ucu hazır (API anahtarı bekliyor)_
+_Son güncelleme: 30 Ekim 2026 — pilot sürümü canlıda; ayrıntı: [PILOT-HAZIRLIK-RAPORU.md](PILOT-HAZIRLIK-RAPORU.md), kullanım: [PILOT.md](PILOT.md)_
 
 ## Bugün neredeyiz (Faz 0 — tamamlandı)
 
