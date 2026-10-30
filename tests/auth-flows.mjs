@@ -261,6 +261,38 @@ try {
   check(!mock.db.students.some((x) => x.id === canId) && mock.db.guardians.length === 1, 'öğrencinin verisi ve veli bağlantısı silindi');
   check(mock.db.users.some((u) => u.email === 'ahmet@veli.test'), 'başka çocuğu olan velinin hesabı korundu');
   check((await page.locator('table.t tbody tr').count()) === 2, 'öğrenci tablosunda 2 satır kaldı');
+  // Tüm PIN'leri yenile (kartlar kaybolduğunda)
+  page.once('dialog', (d) => d.accept());
+  await page.click('[data-act="resetAll"]');
+  await page.waitForSelector('#dlg .pin-card');
+  const newPins = await page.locator('#dlg .pin-card .pin').allInnerTexts();
+  check(newPins.length === 2 && newPins.every((x) => /^\d{4}$/.test(x)), 'şubenin tüm PIN\'leri yenilendi ve kartlar gösterildi');
+  await page.click('#dlg [data-close]');
+  // Öğrenciyi başka şubeye taşı
+  await page.goto(BASE + '/yonetim#subeler');
+  await page.click('[data-act="newSec"] >> nth=0');
+  await page.fill('#fs input[name="name"]', '7/B');
+  await page.click('#fs button.pri');
+  await page.waitForSelector('.sec-card >> nth=1');
+  const secA = mock.db.sections.find((x) => x.name === '7/A').id, secB = mock.db.sections.find((x) => x.name === '7/B').id;
+  await page.goto(BASE + '/yonetim#subeler');
+  await page.click(`[data-open="${secA}"]`);
+  await page.waitForSelector(`[data-stu]`);
+  const ayse = mock.db.students.find((x) => x.first_name.startsWith('Ayşe'));
+  await page.click(`[data-stu="${ayse.id}"]`);
+  await page.waitForSelector('#mvSec');
+  page.once('dialog', (d) => d.accept());
+  await page.click('[data-mv]');
+  await page.waitForSelector('.msg.ok');
+  check(mock.db.students.find((x) => x.id === ayse.id).section_id === secB, 'öğrenci başka şubeye taşındı');
+  // İkinci yönetici
+  const t2 = mock.addUser('ikinci@okul.test', 'x'); mock.db.profiles.push({ id: t2.id, school_id: mock.db.profiles.find((p) => p.full_name === 'Selin Yılmaz').school_id, role: 'teacher', full_name: 'Murat Kaya' });
+  await page.goto(BASE + '/yonetim#okul');
+  await page.waitForSelector(`[data-role="${t2.id}:admin"]`);
+  page.once('dialog', (d) => d.accept());
+  await page.click(`[data-role="${t2.id}:admin"]`);
+  await page.waitForSelector(`[data-role="${t2.id}:teacher"]`);
+  check(mock.db.profiles.find((p) => p.id === t2.id).role === 'admin', 'okula ikinci yönetici atandı');
 
   // ---------------------------------------------------------------- 5. Yetki: veli yönetime giremez, girişsiz panel demo modunda
   await vp.goto(BASE + '/yonetim');

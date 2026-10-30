@@ -12,7 +12,24 @@ const fracVal=s=>{if(typeof s==='number')return s;s=String(s).trim();if(s.includ
 
 const simp=(a,b)=>{const g=gcd(a,b)||1;return `${a/g}/${b/g}`};
 const VIS={
-  render(v,key){if(!v||!VIS[v.type])return '';VREG[key]=v;const st=UI.vs[key]||(UI.vs[key]=VIS.init(v));
+  // Parametreler dışarıdan (yapay zekâ, öğretmen) gelir: metinlerdeki HTML karakterleri zararsız benzerleriyle değiştirilir,
+  // sayısal alanlar sınırlandırılır. Böylece görsel çiziciler parametreyi kaçışsız kullansa bile kod çalışamaz.
+  safe(v){const t=x=>typeof x==='string'?x.replace(/</g,'＜').replace(/>/g,'＞').replace(/"/g,'”').replace(/`/g,'ʼ'):Array.isArray(x)?x.map(t):x&&typeof x==='object'?Object.fromEntries(Object.entries(x).map(([k,y])=>[k,t(y)])):x;
+    const n=(x,d,lo,hi)=>{const y=Number(x);return Number.isFinite(y)?Math.min(hi,Math.max(lo,y)):d};
+    const p=t(v.params&&typeof v.params==='object'?v.params:{});
+    if(v.type==='cubes'){p.l=n(p.l,3,1,6);p.w=n(p.w,2,1,6);p.h=n(p.h,2,1,6)}
+    if(v.type==='coord'&&p.line)p.line={m:n(p.line.m,1,-3,3),b:n(p.line.b,0,-5,5)};
+    if(v.type==='force')p.forces=[].concat(p.forces||[]).slice(0,6).map(f=>({dir:f&&f.dir==='sol'?'sol':'sag',n:n(f&&f.n,10,0,100)}));
+    if(v.type==='numberline'){p.min=n(p.min,0,-1000,1000);p.max=n(p.max,10,p.min+0.001,p.min+1000);p.step=n(p.step,1,(p.max-p.min)/60,p.max-p.min);if(p.target!=null)p.target=n(p.target,null,p.min,p.max)}
+    if(v.type==='areagrid'){p.rows=n(p.rows,10,1,20);p.cols=n(p.cols,10,1,20)}
+    if(v.type==='bars')p.values=[].concat(p.values||[]).slice(0,12).map(x=>n(x,0,0,1e6));
+    if(v.type==='pie')p.values=[].concat(p.values||[]).slice(0,12).map(x=>n(x,0,0,1e6));
+    if(v.type==='dice'&&p.counts)p.counts=[].concat(p.counts).slice(0,12).map(x=>n(x,1,0,100));
+    if(v.type==='pizza')p.maxCut=n(p.maxCut,12,2,16);
+    if(v.type==='atom')p.element=String(p.element||'C').replace(/[^A-Za-z]/g,'').slice(0,2)||'C';
+    if(v.type==='cards')p.items=[].concat(p.items||[]).map(c=>({...c,ic:String(c&&c.ic||'').slice(0,4)}));
+    return {...v,params:p,caption:v.caption}},
+  render(v,key){if(!v||!VIS[v.type])return '';v=VIS.safe(v);VREG[key]=v;const st=UI.vs[key]||(UI.vs[key]=VIS.init(v));
     return `<figure class="vis" id="vis-${key}"><div class="vis-body">${VIS[v.type](v.params||{},key,st)}</div>${v.caption?`<figcaption>${ic('info',13)} ${esc(v.caption)}</figcaption>`:''}</figure>`},
   init(v){const p=v.params||{};switch(v.type){
     case 'pizza':return {n:[1,1],sel:[[],[]]};
@@ -146,7 +163,14 @@ VIS.pie=(p)=>{const L=p.labels||[],V=(p.values||[]).map(fracVal);const T=V.reduc
   return vsvg(360,200,s+L.map((l,i)=>`<rect x="215" y="${30+i*24}" width="14" height="14" rx="3" fill="${PAL[i%PAL.length]}"/>${vtxt(236,42+i*24,`${l} — ${p.values[i]}`,{a:'start',s:12,w:600})}`).join(''),'Daire grafik')};
 
 /* ---------- 6) TERAZİ (denklem) ---------- */
-const evalX=(e,x)=>{try{const s=String(e).replace(/×/g,'*').replace(/·/g,'*').replace(/(\d)\s*x/g,'$1*x').replace(/,/g,'.');return Function('x','return '+s)(x)}catch(_){return NaN}};
+// Güvenli aritmetik değerlendirici (eval/Function kullanmaz): sayılar, x, + − × ÷, parantez.
+const evalX=(e,x)=>{const s=String(e).replace(/[×·]/g,'*').replace(/÷/g,'/').replace(/[□?_]/g,'x').replace(/,/g,'.').replace(/\s+/g,'');let i=0;
+  const num=()=>{const m=/^\d+(\.\d+)?/.exec(s.slice(i));if(!m)return NaN;i+=m[0].length;return +m[0]};
+  const fac=()=>{const c=s[i];if(c==='-'){i++;return -fac()}if(c==='+'){i++;return fac()}if(c==='('){i++;const v=add();if(s[i]!==')')return NaN;i++;return mulImp(v)}if(c==='x'){i++;return mulImp(x)}const v=num();return Number.isNaN(v)?NaN:mulImp(v)};
+  const mulImp=v=>(s[i]==='x'||s[i]==='(')?v*fac():v;
+  const mul=()=>{let v=fac();while(s[i]==='*'||s[i]==='/'){const o=s[i++];const r=fac();v=o==='*'?v*r:v/r}return v};
+  const add=()=>{let v=mul();while(s[i]==='+'||s[i]==='-'){const o=s[i++];const r=mul();v=o==='+'?v+r:v-r}return v};
+  try{const v=add();return i===s.length?v:NaN}catch(_){return NaN}};
 VIS.balance=(p,key,st)=>{const L=evalX(p.left||'x',st.x),R=evalX(p.right||'0',st.x);const d=isNaN(L-R)?0:Math.max(-1,Math.min(1,(R-L)/Math.max(4,Math.abs(L)+Math.abs(R))*3));const ang=d*14;const eq=Math.abs(L-R)<1e-9;
   return vsvg(360,190,`<path d="M170 170h20l-10-110z" fill="#C9B79C"/><rect x="120" y="170" width="120" height="10" rx="4" fill="#8A7B6B"/><g transform="rotate(${ang} 180 60)"><rect x="50" y="56" width="260" height="8" rx="4" fill="#6B5B4B"/><path d="M60 64l-20 50h80l-20-50" fill="none" stroke="#8A7B6B" stroke-width="2"/><path d="M300 64l-20 50h80l-20-50" fill="none" stroke="#8A7B6B" stroke-width="2"/><rect x="30" y="112" width="100" height="10" rx="4" fill="#E9DCC6"/><rect x="250" y="112" width="100" height="10" rx="4" fill="#E9DCC6"/>${vtxt(80,104,p.left,{s:15,c:VC.blu})}${vtxt(300,104,p.right,{s:15,c:VC.red})}${vtxt(80,140,'= '+(isNaN(L)?'?':+L.toFixed(2)),{s:12,c:VC.mut})}${vtxt(300,140,'= '+(isNaN(R)?'?':+R.toFixed(2)),{s:12,c:VC.mut})}</g>`,'Eşit kollu terazi')+
    `<div class="vis-stat ${eq?'ok':''}">x = <b>${st.x}</b> ${eq?` · ${ic('okc',14)} Terazi dengede! Eşitlik sağlandı.`:L>R?' · Sol taraf ağır':' · Sağ taraf ağır'}</div><div class="vis-tools">${vbtn(key,'x','− 1',-1)}${vbtn(key,'x','+ 1',1)}<span class="meta">x'in değerini değiştir, teraziyi dengele.</span></div>`};

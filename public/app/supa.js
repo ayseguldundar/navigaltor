@@ -34,8 +34,14 @@ export async function rpc(fn, args) {
 export async function currentProfile() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return null;
-  const { data } = await supabase.from('profiles').select('id, role, full_name, school_id').eq('id', session.user.id).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('id, role, full_name, school_id').eq('id', session.user.id).maybeSingle();
+  if (error) throw new Error('Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.');
   return data;
+}
+
+// Bağlantı sorunu ekranı: oturumu silmeden yeniden denemeyi sağlar (ağ hatası çıkış sayılmaz).
+export function showOffline(el, msg = 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip yeniden deneyin.') {
+  el.innerHTML = `<div class="card"><div class="msg err">${esc(msg)}</div><button class="btn pri" onclick="location.reload()">Yeniden dene</button></div>`;
 }
 
 export const homeFor = (role) => (role === 'student' ? '/ogrenci' : role === 'parent' ? '/veli' : '/yonetim');

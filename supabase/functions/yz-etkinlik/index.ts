@@ -7,6 +7,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 
 const MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
 const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') || 40);
+// Tüm okullar için günlük toplam üst sınır (maliyet güvencesi).
+const GLOBAL_DAILY_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') || 300);
 
 const pick = (j: string | undefined, legacy: string | undefined) => {
   try { const o = JSON.parse(j ?? ''); if (o?.default) return o.default as string; } catch { /* eski anahtar */ }
@@ -172,9 +174,10 @@ function normalize(d: Obj) {
   };
 }
 
+// Kazanım kodları ve HTML açılı ayraçları temizlenir (çıktı her ekranda ayrıca kaçışlanır).
 const CODE_RE = /\b(MAT|TUR|FEN|SOS|ING|FB|SB|ENG|T)\.?\s?\d+(\.\d+){1,3}\b/g;
 const stripCodes = (v: unknown): unknown =>
-  typeof v === 'string' ? v.replace(CODE_RE, '').replace(/\s{2,}/g, ' ').trim()
+  typeof v === 'string' ? v.replace(CODE_RE, '').replace(/</g, '‹').replace(/>/g, '›').replace(/\s{2,}/g, ' ').trim()
     : Array.isArray(v) ? v.map(stripCodes)
     : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, stripCodes(x)])) : v;
 
@@ -191,8 +194,13 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return fail('Yapay zekâ henüz yapılandırılmadı (API anahtarı eksik).', 503);
 
-  const { data: quota } = await admin.rpc('srv_ai_quota', { p_teacher: prof.id, p_daily_limit: DAILY_LIMIT });
-  if (quota && !quota.ok) return fail(`Günlük üretim sınırına ulaşıldı (${quota.limit}). Yarın yeniden deneyebilirsiniz.`, 429);
+  const { data: quota, error: qErr } = await admin.rpc('srv_ai_quota', { p_teacher: prof.id, p_daily_limit: DAILY_LIMIT });
+  if (qErr || !quota) return fail('Üretim kotası denetlenemedi. Biraz sonra yeniden deneyin.', 503);
+  if (!quota.ok) return fail(`Günlük üretim sınırına ulaşıldı (${quota.limit}). Yarın yeniden deneyebilirsiniz.`, 429);
+  const { count: allToday, error: gErr } = await admin.from('ai_generations').select('id', { count: 'exact', head: true })
+    .gte('created_at', new Date(Date.now() - 864e5).toISOString());
+  if (gErr || allToday == null) return fail('Üretim kotası denetlenemedi. Biraz sonra yeniden deneyin.', 503);
+  if (allToday >= GLOBAL_DAILY_LIMIT) return fail('Sistem genelinde günlük üretim sınırına ulaşıldı. Yarın yeniden deneyebilirsiniz.', 429);
 
   let b: Record<string, unknown>;
   try { b = await req.json(); } catch { return fail('Geçersiz istek'); }
@@ -214,9 +222,10 @@ Deno.serve(async (req) => {
     structure: String(b.structure ?? '').slice(0, 800),
   };
 
-  const { data: row } = await admin.from('ai_generations')
+  const { data: row, error: insErr } = await admin.from('ai_generations')
     .insert({ school_id: prof.school_id, teacher_id: prof.id, request: req_, model: MODEL })
     .select('id').single();
+  if (insErr || !row) return fail('Üretim kaydı oluşturulamadı. Biraz sonra yeniden deneyin.', 503);
 
   const prompt = [
     `Ders: ${COURSES[course]} · ${grade}. sınıf`,
@@ -244,12 +253,12 @@ Deno.serve(async (req) => {
       }),
     });
   } catch (e) {
-    await admin.from('ai_generations').update({ status: 'error', error: String(e) }).eq('id', row?.id);
+    await admin.from('ai_generations').update({ status: 'error', error: String(e) }).eq('id', row.id);
     return fail('Yapay zekâ hizmetine ulaşılamadı. Biraz sonra yeniden deneyin.', 502);
   }
   const out = await res.json().catch(() => ({}));
   if (!res.ok) {
-    await admin.from('ai_generations').update({ status: 'error', error: JSON.stringify(out).slice(0, 2000) }).eq('id', row?.id);
+    await admin.from('ai_generations').update({ status: 'error', error: JSON.stringify(out).slice(0, 2000) }).eq('id', row.id);
     return fail(res.status === 529 || res.status === 429 ? 'Yapay zekâ şu an yoğun. Bir dakika sonra yeniden deneyin.'
       : 'Taslak üretilemedi.', 502);
   }
@@ -264,7 +273,7 @@ Deno.serve(async (req) => {
   const norm = draft ? normalize(draft) : null;
   const missing = norm ? (['title', 'scenario', 'steps', 'checklist'] as const).filter((k) => !norm[k] || (Array.isArray(norm[k]) && !norm[k].length)) : ['tümü'];
   if (!norm || missing.length) {
-    await admin.from('ai_generations').update({ status: 'error', error: 'eksik çıktı: ' + missing.join(',') }).eq('id', row?.id);
+    await admin.from('ai_generations').update({ status: 'error', error: 'eksik çıktı: ' + missing.join(',') }).eq('id', row.id);
     return fail('Taslak eksik üretildi. Yeniden deneyin.', 502);
   }
   const activity = stripCodes({
@@ -272,12 +281,12 @@ Deno.serve(async (req) => {
     course, grade, duration: req_.duration, format: req_.format, themeName: req_.unit,
     aiLevel: level, aiNote: req_.note, src: 'AI', model: MODEL,
   }) as Record<string, unknown>;
-  activity.id = 'ai-' + (row?.id ?? crypto.randomUUID());
+  activity.id = 'ai-' + (row.id ?? crypto.randomUUID());
 
   await admin.from('ai_generations').update({
     status: 'ok', response: activity,
     input_tokens: out.usage?.input_tokens ?? null, output_tokens: out.usage?.output_tokens ?? null,
-  }).eq('id', row?.id);
+  }).eq('id', row.id);
 
   return json({ activity, usage: out.usage ?? null, ms: Date.now() - t0, quota: quota ?? null });
 });

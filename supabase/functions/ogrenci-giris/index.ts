@@ -1,6 +1,6 @@
 // Öğrenci girişi 2. adım: sınıf kodu + seçilen öğrenci + 4 haneli PIN → oturum.
 // Öğrencinin e-postası yoktur; arka planda yalnızca sistemin bildiği bir hesap açılır ve oturum sunucuda üretilir.
-// 5 hatalı PIN denemesinde hesap 15 dakika kilitlenir (veritabanında).
+// Her 5 hatalı PIN denemesinde hesap kilitlenir: 15 dk, sonra 30 dk, 1 saat… en çok 4 saat (veritabanında).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 
 const pick = (j: string | undefined, legacy: string | undefined) => {
@@ -23,7 +23,7 @@ const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
 const allowed = async (bucket: string, max: number, windowSec: number) => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return !error && data === true;
+  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
 };
 const studentEmail = (id: string) => `ogrenci-${id}@ogrenci.navigaitor.app`;
 
@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
   if (!/^[A-Z0-9]{6}$/.test(code) || !/^[0-9a-f-]{36}$/i.test(studentId) || !/^\d{4}$/.test(pin)) {
     return fail('Sınıf kodu, isim ve 4 haneli şifre gerekli.');
   }
-  if (!(await allowed('ogrenci-giris:' + clientIp(req), 120, 600))) {
+  // Okul ağında tüm öğrenciler aynı IP'yi paylaşır: sınır sınıf kodu başına ve IP başına geniş tutulur; asıl koruma öğrenci başına PIN kilididir.
+  if (!(await allowed('ogrenci-giris:' + code, 400, 600)) || !(await allowed('ogrenci-giris-ip:' + clientIp(req), 1500, 600))) {
     return fail('Çok fazla deneme. Birkaç dakika sonra yeniden deneyin.', 429);
   }
 
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
   if (!v.ok) {
     const msg: Record<string, string> = {
       wrong_pin: 'Şifre yanlış. Tekrar dene.',
-      locked: 'Çok fazla yanlış deneme yapıldı. 15 dakika sonra tekrar dene ya da öğretmenine söyle.',
+      locked: 'Çok fazla yanlış deneme yapıldı. Biraz sonra tekrar dene ya da öğretmeninden yeni şifre iste.',
       no_pin: 'Şifren henüz hazır değil. Öğretmenine söyle.',
       not_found: 'Bu sınıfta seni bulamadık. Öğretmenine söyle.',
     };

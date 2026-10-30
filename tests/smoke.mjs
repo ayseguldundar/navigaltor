@@ -44,7 +44,7 @@ try {
   check(noVisual.length === 0, `her etkinlikte görsel var${noVisual.length ? ' — eksik: ' + noVisual.join(', ') : ''}`);
 
   // Kazanım kodu sızıntısı yok
-  const codeRe = /\b(MAT|TUR|FEN|SOS|ING)\d-\d+\b|\b(MAT|FB|SB|ENG)\.?\d+\.\d+/;
+  const codeRe = /\b(MAT|TUR|FEN|SOS|ING)\d-\d+\b|\b(MAT|TUR|FEN|SOS|ING|FB|SB|ENG|T)\.\s?\d+(\.\d+){1,3}\b/;
   const leaks = [];
   for (const r of teacherRoutes) { await go(r, 250); if (codeRe.test(await page.evaluate(() => document.body.innerText))) leaks.push(r); }
   check(leaks.length === 0, `arayüzde kazanım kodu görünmüyor${leaks.length ? ' — ' + leaks.join(', ') : ''}`);

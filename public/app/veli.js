@@ -1,6 +1,7 @@
 // Veli uygulaması (gerçek veri): bağlı çocuklar, atanan ve tamamlanan etkinlikler, çalışılan beceriler, çocuk ekleme.
 // Karşılaştırma ve sıralama gösterilmez; yalnızca çocuğun kendi gelişimi.
-import { supabase, callFn, currentProfile, homeFor, signOut, esc, changePasswordDialog } from './supa.js';
+import { showOffline, supabase, callFn, currentProfile, homeFor, signOut, esc, changePasswordDialog } from './supa.js';
+import { KVKK } from './kvkk.js';
 
 const COURSE = { MAT: 'Matematik', TUR: 'Türkçe', FEN: 'Fen Bilimleri', SOS: 'Sosyal Bilgiler', ING: 'İngilizce' };
 const app = document.getElementById('app');
@@ -9,7 +10,8 @@ const dlgBody = document.getElementById('dlgBody');
 const S = { kids: [], cur: null, assigns: [], subs: [], sections: {} };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) : '');
 
-const me = await currentProfile().catch(() => null);
+let me = null;
+try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || me.role !== 'parent') {
   location.replace(me ? homeFor(me.role) : '/giris#veli');
   await new Promise(() => {});
@@ -70,14 +72,15 @@ function addChildDialog() {
   dlgBody.innerHTML = `<h2>Çocuk ekle</h2><p class="muted small">Öğretmenden aldığınız 8 karakterlik davet kodunu yazın.</p>
     <form id="fk"><div class="fld"><label for="ic">Davet kodu</label><input class="in code" id="ic" maxlength="8" required autocapitalize="characters"></div>
     <div class="fld"><label for="rl">Yakınlık</label><select class="in" id="rl"><option>Anne</option><option>Baba</option><option>Vasi</option><option>Diğer</option></select></div>
-    <label class="row small" style="margin-bottom:12px;align-items:flex-start"><input type="checkbox" id="cs" required style="margin-top:3px"> <span>Aydınlatma metnini okudum; bu çocuğun verilerinin eğitim amacıyla işlenmesine açık rıza veriyorum. <a href="/giris#veli" target="_blank">Metni oku</a></span></label>
+    <label class="row small" style="margin-bottom:12px;align-items:flex-start"><input type="checkbox" id="cs" required style="margin-top:3px"> <span>Aydınlatma metnini okudum; bu çocuğun verilerinin eğitim amacıyla işlenmesine açık rıza veriyorum.</span></label>
+    <details class="small" style="margin:-4px 0 12px"><summary>Aydınlatma metnini oku</summary><div class="consent" style="max-height:220px;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px">${KVKK}</div></details>
     <div id="fkMsg"></div><div class="row"><span class="sp"></span><button type="button" class="btn" data-close>Vazgeç</button><button class="btn pri">Ekle</button></div></form>`;
   dlg.showModal();
   dlgBody.querySelector('#fk').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       await callFn('kayit-veli', { mode: 'link', inviteCode: dlgBody.querySelector('#ic').value, relation: dlgBody.querySelector('#rl').value, consent: dlgBody.querySelector('#cs').checked }, { auth: true });
-      dlg.close(); await load(); S.cur = S.kids[S.kids.length - 1].id; draw();
+      const before = new Set(S.kids.map((k) => k.id)); dlg.close(); await load(); S.cur = (S.kids.find((k) => !before.has(k.id)) || S.kids[S.kids.length - 1]).id; draw();
     } catch (err) { dlgBody.querySelector('#fkMsg').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   });
 }

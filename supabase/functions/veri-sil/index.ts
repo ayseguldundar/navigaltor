@@ -35,15 +35,16 @@ Deno.serve(async (req) => {
   if (pErr) return fail('Silme hazırlanamadı.', 500);
   if (!plan.ok) return fail(plan.reason, 403);
 
-  const { error: dErr } = await admin.from('students').delete().eq('id', studentId);
-  if (dErr) return fail('Öğrenci kaydı silinemedi.', 500);
+  // Önce giriş hesapları silinir; biri başarısız olursa öğrenci kaydı yerinde kalır ve işlem güvenle yeniden denenebilir.
   const accounts = [plan.student_auth, ...(plan.parent_auth ?? [])].filter(Boolean) as string[];
   const failed: string[] = [];
   for (const id of accounts) {
     const { error } = await admin.auth.admin.deleteUser(id);
     if (error && !/not.?found/i.test(error.message)) failed.push(id);
   }
+  if (failed.length) return fail('Bazı giriş hesapları silinemedi; öğrenci kaydı korunuyor. Lütfen yeniden deneyin.', 500);
+  const { error: dErr } = await admin.from('students').delete().eq('id', studentId);
+  if (dErr) return fail('Öğrenci kaydı silinemedi. Lütfen yeniden deneyin.', 500);
   await admin.from('admin_log').insert({ school_id: plan.school_id, actor_id: u.user.id, action: 'ogrenci_sil' });
-  if (failed.length) return fail('Öğrenci kaydı silindi ancak bazı giriş hesapları silinemedi. Lütfen yeniden deneyin veya destek isteyin.', 500);
   return json({ ok: true, deletedAccounts: accounts.length });
 });

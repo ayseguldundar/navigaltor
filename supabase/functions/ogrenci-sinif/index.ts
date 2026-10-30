@@ -19,7 +19,7 @@ const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
 const allowed = async (bucket: string, max: number, windowSec: number) => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return !error && data === true;
+  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
 };
 
 Deno.serve(async (req) => {
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
   const code = String(body.classCode ?? '').trim().toUpperCase();
   if (!/^[A-Z0-9]{6}$/.test(code)) return fail('Sınıf kodu 6 karakter olmalı.');
   // Okul ağında birçok öğrenci aynı IP'den bağlanır; sınır buna göre geniş tutuldu.
-  if (!(await allowed('ogrenci-sinif:' + clientIp(req), 120, 600))) {
+  if (!(await allowed('ogrenci-sinif:' + clientIp(req), 900, 600))) {
     return fail('Çok fazla deneme. Birkaç dakika sonra yeniden deneyin.', 429);
   }
   const { data, error } = await admin.rpc('srv_class_roster', { p_code: code });

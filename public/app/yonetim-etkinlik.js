@@ -243,8 +243,11 @@ export function createEtkinlik(ctx) {
     if (d.fbsave) {
       const [aid, sid] = d.fbsave.split(':');
       const val = app().querySelector(`[data-fb="${sid}"]`).value;
+      const keep = Object.fromEntries([...app().querySelectorAll('[data-fb]')].map((i) => [i.dataset.fb, i.value]));
       await rpc('set_teacher_feedback', { p_assignment: aid, p_student: sid, p_text: val });
-      await loadAssigns(); flash('ok', 'Geri bildirim kaydedildi.'); return true;
+      await loadAssigns(); flash('ok', 'Geri bildirim kaydedildi.');
+      Object.entries(keep).forEach(([k, v]) => { const n = app().querySelector(`[data-fb="${k}"]`); if (n && k !== sid) n.value = v; });
+      return true;
     }
     return false;
   }

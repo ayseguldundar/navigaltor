@@ -20,9 +20,10 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
 const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
+const userMsg = (m: string) => (/Davet|davet|Okul adı|eşleşmiyor/.test(m) ? m.split('\n')[0].slice(0, 160) : '');
 const allowed = async (bucket: string, max: number, windowSec: number) => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return !error && data === true;
+  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
 };
 
 Deno.serve(async (req) => {
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
   const relation = String(body.relation ?? '').trim().slice(0, 30);
   if (!/^[A-Z0-9]{8}$/.test(inviteCode)) return fail('Davet kodu 8 karakter olmalı.');
   if (body.consent !== true) return fail('Devam etmek için açık rıza metnini onaylamanız gerekiyor.');
-  if (!(await allowed('kayit-veli:' + clientIp(req), 10, 3600))) {
+  if (!(await allowed('kayit-veli:' + clientIp(req), 120, 3600))) {
     return fail('Çok fazla deneme. Bir saat sonra yeniden deneyin.', 429);
   }
 
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
     const { error } = await admin.rpc('srv_link_parent', {
       p_user: u.user.id, p_invite: inviteCode, p_consent_version: CONSENT_VERSION, p_relation: relation,
     });
-    if (error) return fail(error.message);
+    if (error) return fail(userMsg(error.message) || 'Çocuk eklenemedi. Lütfen yeniden deneyin.');
     return json({ ok: true });
   }
 
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
   });
   if (rErr) {
     await admin.auth.admin.deleteUser(created.user.id);
-    return fail(rErr.message);
+    return fail(userMsg(rErr.message) || 'Kayıt tamamlanamadı. Lütfen yeniden deneyin.');
   }
   return json({ ok: true });
 });

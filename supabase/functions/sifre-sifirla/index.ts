@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
   const password = tempPassword();
   const { error } = await admin.auth.admin.updateUserById(target, { password });
   if (error) return fail('Şifre sıfırlanamadı.', 500);
-  await admin.auth.admin.signOut(target).catch(() => {}); // açık oturumları kapat (desteklenmiyorsa yok say)
+  const { error: rvErr } = await admin.rpc('srv_revoke_sessions', { p_user: target }); // açık oturumları kapat
   await admin.rpc('srv_log_password_reset', { p_actor: u.user.id, p_school: chk.school_id });
-  return json({ ok: true, password });
+  return json({ ok: true, password, sessionsRevoked: !rvErr });
 });

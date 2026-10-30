@@ -6,6 +6,9 @@ import { join, extname, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+// vercel.json'daki ortak güvenlik başlıkları (CSP dahil) yerelde de uygulanır; testler yayındaki koşulları görür.
+const VERCEL = JSON.parse(await readFile(join(DIST, '..', 'vercel.json'), 'utf8'));
+const COMMON = Object.fromEntries(((VERCEL.headers || []).find((h) => h.source === '/(.*)') || { headers: [] }).headers.map((h) => [h.key, h.value]));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png',
   '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml', '.css': 'text/css' };
 
@@ -24,7 +27,7 @@ export function startServer(port = 4173) {
   const server = createServer(async (req, res) => {
     const file = await resolve(new URL(req.url, 'http://x').pathname);
     if (!file) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); return res.end('Bulunamadı'); }
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+    res.writeHead(200, { ...COMMON, 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
     res.end(await readFile(file));
   });
   return new Promise((ok) => server.listen(port, () => ok(server)));

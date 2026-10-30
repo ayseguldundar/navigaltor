@@ -1,5 +1,5 @@
 // Öğretmen / okul yöneticisi konsolu: şubeler, öğrenci listesi ve PIN kartları, veli davetleri, öğretmen davetleri, yapay zekâ kayıtları.
-import { supabase, rpc, callFn, currentProfile, signOut, ROLE_TR, esc, changePasswordDialog } from './supa.js';
+import { showOffline, supabase, rpc, callFn, currentProfile, signOut, ROLE_TR, esc, changePasswordDialog } from './supa.js';
 import { parseRoster } from './liste.js';
 import { createEtkinlik } from './yonetim-etkinlik.js';
 
@@ -9,7 +9,8 @@ const dlg = document.getElementById('dlg');
 const dlgBody = document.getElementById('dlgBody');
 const S = { tab: 'subeler', ctx: null, me: null, sec: null, students: [], guardians: new Set(), invites: {}, teachers: [], tinv: [], gens: [], msg: null, busy: false, parsed: null };
 
-const me = await currentProfile().catch(() => null);
+let me = null;
+try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || !['admin', 'teacher'].includes(me.role)) {
   location.replace(me ? (me.role === 'student' ? '/ogrenci' : '/veli') : '/giris#ogretmen');
   await new Promise(() => {}); // yönlendirme sürerken başka bir şey yapma
@@ -82,7 +83,7 @@ function viewStudents() {
     <button class="btn pri" data-act="import">+ Öğrenci ekle</button></div>${msg()}
   <div class="card">
     <div class="row" style="margin-bottom:10px"><b>${esc(sec.name)}</b><span class="chip">Sınıf kodu: <span class="code">${esc(sec.class_code)}</span></span><span class="sp"></span>
-      ${S.students.length ? '<button class="btn sm" data-act="printAll">PIN kartlarını yazdır</button>' : ''}</div>
+      ${S.students.length ? '<button class="btn sm" data-act="resetAll" title="Kartlar kaybolduysa: tüm öğrencilere yeni PIN üretir ve yazdırır">Tüm PIN\'leri yenile</button>' : ''}</div>
     ${S.students.length ? `<div class="tw"><table class="t"><thead><tr><th>No</th><th>Ad soyad</th><th>Giriş</th><th>Veli</th><th></th></tr></thead><tbody>
       ${S.students.map((s) => `<tr style="${s.active ? '' : 'opacity:.5'}"><td>${esc(s.student_no || '—')}</td><td><button class="linkb" data-stu="${s.id}"><b>${esc(s.first_name)} ${esc(s.last_name)}</b></button>${s.active ? '' : ' <span class="chip">pasif</span>'}</td>
         <td>${s.auth_user_id ? '<span class="tag-ok">✓ giriş yaptı</span>' : '<span class="tag-no">henüz yok</span>'}</td>
@@ -98,7 +99,7 @@ function viewSchool() {
   const secs = S.ctx.sections;
   return `<div class="hero"><h1>Okul ve öğretmenler</h1></div>${msg()}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-    <div class="card"><h3>Öğretmen davet et</h3><p class="small muted">Öğretmen, giriş ekranında “Okulumdan davet kodum var” seçeneğiyle bu kodu girerek okulunuza katılır. Kod 30 gün geçerlidir ve birden fazla öğretmen kullanabilir.</p>
+    <div class="card"><h3>Öğretmen davet et</h3><p class="small muted">Öğretmen, giriş ekranında “Okulumdan davet kodum var” seçeneğiyle bu kodu girerek okulunuza katılır. Kod <b>tek kullanımlıktır</b> ve 7 gün geçerlidir; her öğretmen için yeni kod üretin. Yeni kod, kullanılmamış eski kodu geçersiz kılar.</p>
       ${S.tinv.length ? `<div class="row"><span class="code cc" style="font-size:22px;color:var(--brand)">${S.tinv[0].code}</span><button class="btn sm" data-copy="${S.tinv[0].code}">Kopyala</button></div>
         <p class="small muted">Son geçerlilik: ${new Date(S.tinv[0].expires_at).toLocaleDateString('tr-TR')}</p>` : ''}
       <button class="btn ${S.tinv.length ? '' : 'pri'}" data-act="tinv">${S.tinv.length ? 'Yeni kod üret' : 'Davet kodu üret'}</button></div>
@@ -110,7 +111,7 @@ function viewSchool() {
         <button class="btn pri">Ata</button></form>` : '<p class="muted small">Önce şube açın ve öğretmen davet edin.</p>'}</div>
   </div>
   <div class="card" style="margin-top:14px"><h3>Okuldaki öğretmenler</h3><div class="tw"><table class="t"><thead><tr><th>Ad soyad</th><th>Rol</th><th></th></tr></thead><tbody>
-    ${S.teachers.map((t) => `<tr><td>${esc(t.full_name)}</td><td>${ROLE_TR[t.role]}</td><td style="text-align:right">${t.id === S.me.id ? '<span class="small muted">siz</span>' : `<button class="btn sm" data-pwd="${t.id}">Şifre sıfırla</button>`}</td></tr>`).join('')}</tbody></table></div></div>
+    ${S.teachers.map((t) => `<tr><td>${esc(t.full_name)}</td><td>${ROLE_TR[t.role]}</td><td style="text-align:right">${t.id === S.me.id ? '<span class="small muted">siz</span>' : `<button class="btn sm" data-role="${t.id}:${t.role === 'admin' ? 'teacher' : 'admin'}">${t.role === 'admin' ? 'Öğretmen yap' : 'Yönetici yap'}</button> <button class="btn sm" data-pwd="${t.id}">Şifre sıfırla</button>`}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="card" style="margin-top:14px"><h3>Veli hesapları</h3>
     ${(S.parents || []).length ? `<div class="tw"><table class="t"><thead><tr><th>Ad soyad</th><th></th></tr></thead><tbody>
     ${S.parents.map((t) => `<tr><td>${esc(t.full_name)}</td><td style="text-align:right"><button class="btn sm" data-pwd="${t.id}">Şifre sıfırla</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Henüz veli hesabı yok. Veliler, öğrenci listesinde ürettiğiniz davet koduyla kaydolur.</p>'}
@@ -145,12 +146,22 @@ app.addEventListener('click', async (e) => {
     if (d.stu) { studentDialog(d.stu); return; }
     if (d.sdel) { deleteStudentDialog(d.sdel); return; }
     if (d.pwd) { resetPasswordDialog(d.pwd); return; }
+    if (d.role) {
+      const [uid, role] = d.role.split(':'); const t = S.teachers.find((x) => x.id === uid);
+      if (!confirm(role === 'admin' ? `${t.full_name} okul yöneticisi yapılsın mı? Yönetici; öğretmen davet edebilir, şifre sıfırlayabilir ve öğrenci verisini silebilir.` : `${t.full_name} öğretmen yapılsın mı? Yönetici yetkileri kaldırılır.`)) return;
+      await rpc('set_staff_role', { p_user: uid, p_role: role }); await loadSchool(); flash('ok', 'Rol güncellendi.'); return;
+    }
     if (d.tab) { e.preventDefault(); await go(d.tab); }
     else if (d.copy) { await navigator.clipboard.writeText(d.copy).catch(() => {}); flash('ok', `“${d.copy}” kopyalandı.`); }
     else if (d.open) { S.sec = d.open; await go('ogrenciler'); }
     else if (d.act === 'newSec') newSectionDialog();
     else if (d.act === 'import') importDialog();
-    else if (d.act === 'printAll') printCards(S.students.map((s) => ({ ...s, pin: null })), true);
+    else if (d.act === 'resetAll') {
+      const sec = S.ctx.sections.find((x) => x.id === S.sec);
+      if (!confirm(`${sec.name} şubesindeki tüm etkin öğrenciler için yeni PIN üretilsin mi? Eski PIN'ler geçersiz olur.`)) return;
+      const res = await rpc('reset_section_pins', { p_section: S.sec });
+      printCards(res, false);
+    }
     else if (d.act === 'tinv') { await rpc('create_teacher_invite'); await loadSchool(); flash('ok', 'Yeni öğretmen davet kodu üretildi.'); }
     else if (d.pin) {
       const s = S.students.find((x) => x.id === d.pin);
@@ -183,7 +194,19 @@ async function onAssign(e) {
 
 // ---------------------------------------------------------------- pencereler
 function openDlg(html) { dlgBody.innerHTML = html; dlg.showModal(); }
-dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+dlg.addEventListener('click', async (e) => {
+  if (e.target === dlg || e.target.closest('[data-close]')) { dlg.close(); return; }
+  const b = e.target.closest('button[data-mv]');
+  if (!b) return;
+  const sid = b.dataset.mv, sec = dlgBody.querySelector('#mvSec')?.value;
+  const st = S.students.find((x) => x.id === sid), to = S.ctx.sections.find((x) => x.id === sec);
+  if (!st || !to) return;
+  if (!confirm(`${st.first_name} ${st.last_name}, ${to.name} şubesine taşınsın mı? PIN'i, veli bağlantısı ve geçmiş çalışmaları korunur.`)) return;
+  try {
+    await rpc('move_student', { p_student: sid, p_section: sec });
+    dlg.close(); await loadCtx(); await loadStudents(); flash('ok', `${st.first_name} ${to.name} şubesine taşındı.`);
+  } catch (err) { dlg.close(); flash('err', err.message); }
+});
 
 function newSectionDialog() {
   openDlg(`<h2>Yeni şube</h2><p class="muted small">Şube açıldığında öğrencilerin giriş yapacağı 6 karakterlik sınıf kodu otomatik üretilir.</p>
@@ -265,6 +288,7 @@ async function studentDialog(id) {
   const skills = {};
   (as.data || []).forEach((a) => { const x = (sb.data || []).find((y) => y.assignment_id === a.id); if (x && x.status === 'tamamlandi') (a.activity.skills21 || []).forEach((k) => { skills[k] = (skills[k] || 0) + 1; }); });
   const done = (sb.data || []).filter((x) => x.status === 'tamamlandi').length;
+  const others = S.ctx.sections.filter((x) => x.id !== S.sec);
   dlgBody.innerHTML = `<h2>${esc(s.first_name)} ${esc(s.last_name)}</h2>
     <p class="small muted">${s.student_no ? 'No ' + esc(s.student_no) + ' · ' : ''}${s.auth_user_id ? 'Sisteme giriş yaptı' : 'Henüz giriş yapmadı'} · Veli: ${S.guardians.has(s.id) ? 'bağlı' : 'bağlı değil'}</p>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:12px 0"><div class="card"><div class="small muted">Atanan etkinlik</div><b style="font-size:24px">${(as.data || []).length}</b></div>
@@ -273,6 +297,8 @@ async function studentDialog(id) {
     <h3 style="margin-top:12px">Etkinlikler</h3><div class="tw"><table class="t"><tbody>${(as.data || []).map((a) => { const x = (sb.data || []).find((y) => y.assignment_id === a.id);
       return `<tr><td>${esc(a.title)}</td><td>${x ? (x.status === 'tamamlandi' ? '<span class="tag-ok">Tamamladı</span>' : '<span class="tag-mid">Devam ediyor</span>') : '<span class="tag-no">Başlamadı</span>'}</td><td class="small">${x && x.reflection ? esc(x.reflection) : ''}</td></tr>`; }).join('') || '<tr><td class="muted">Atama yok.</td></tr>'}</tbody></table></div>
     <h3 style="margin-top:12px">Navi tanışma formu</h3>${ozet.length ? `<div class="ozet">${ozet.map((x) => `<div><span>${esc(x.q)}</span><b>${esc(x.a)}</b></div>`).join('')}</div>` : '<p class="small muted">Öğrenci formu henüz doldurmadı.</p>'}
+    ${others.length ? `<h3 style="margin-top:12px">Şube değiştir</h3><div class="row"><select class="in" id="mvSec" style="width:auto" aria-label="Yeni şube">${others.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select><button class="btn sm" data-mv="${s.id}">Taşı</button></div>
+      <p class="small muted">PIN'i, veli bağlantısı ve geçmiş çalışmaları korunur; yeni şubenin etkinliklerini görür.</p>` : ''}
     <div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn" data-close>Kapat</button></div>`;
 }
 
@@ -296,7 +322,7 @@ function deleteStudentDialog(id) {
 
 function resetPasswordDialog(id) {
   const p = [...S.teachers, ...(S.parents || [])].find((x) => x.id === id);
-  openDlg(`<h2>Geçici şifre üret</h2><p><b>${esc(p.full_name)}</b> (${ROLE_TR[p.role]}) için yeni bir geçici şifre üretilecek. Eski şifre geçersiz olur ve açık oturumları kapanır.</p>
+  openDlg(`<h2>Geçici şifre üret</h2><p><b>${esc(p.full_name)}</b> (${ROLE_TR[p.role]}) için yeni bir geçici şifre üretilecek. Eski şifre geçersiz olur.</p>
     <div id="pwMsg"></div><div class="row"><span class="sp"></span><button class="btn" data-close>Vazgeç</button><button class="btn pri" id="pwGo">Geçici şifre üret</button></div>`);
   const go = dlgBody.querySelector('#pwGo');
   go.addEventListener('click', async () => {
@@ -305,7 +331,7 @@ function resetPasswordDialog(id) {
       const r = await callFn('sifre-sifirla', { userId: id }, { auth: true });
       dlgBody.innerHTML = `<h2>Geçici şifre hazır</h2><p><b>${esc(p.full_name)}</b> bu şifreyle giriş yapabilir:</p>
         <div class="row"><span class="code cc" style="font-size:22px;color:var(--brand)">${esc(r.password)}</span><button class="btn sm" data-copy="${esc(r.password)}">Kopyala</button></div>
-        <p class="small muted">Şifre yalnızca şimdi görünür ve saklanmaz. Kişiye yüz yüze ya da güvenli bir kanaldan iletin.</p>
+        <p class="small muted">Şifre yalnızca şimdi görünür ve saklanmaz. Kişiye yüz yüze ya da güvenli bir kanaldan iletin.${r.sessionsRevoked ? ' Kişinin açık oturumları kapatıldı.' : ' Not: Kişinin açık olan oturumu varsa, çıkış yapana kadar açık kalabilir.'}</p>
         <div class="row"><span class="sp"></span><button class="btn pri" data-close>Tamam</button></div>`;
       dlgBody.querySelector('[data-copy]').addEventListener('click', (e) => navigator.clipboard.writeText(e.target.dataset.copy).catch(() => {}));
     } catch (err) { dlgBody.querySelector('#pwMsg').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; go.disabled = false; go.textContent = 'Geçici şifre üret'; }

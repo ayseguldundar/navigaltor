@@ -1,5 +1,5 @@
 // Öğrenci uygulaması (gerçek veri): Navi tanışma formu, görevlerim, etkinlik sayfası ve tamamlama.
-import { supabase, rpc, currentProfile, homeFor, signOut, esc } from './supa.js';
+import { showOffline, supabase, rpc, currentProfile, homeFor, signOut, esc } from './supa.js';
 
 const COURSE = { MAT: ['Matematik', '#B3123A', '📐'], TUR: ['Türkçe', '#E07A2F', '📖'], FEN: ['Fen Bilimleri', '#1F9D6B', '🔬'], SOS: ['Sosyal Bilgiler', '#6A55C8', '🌍'], ING: ['İngilizce', '#2F7DD8', '💬'] };
 const app = document.getElementById('app');
@@ -7,7 +7,8 @@ const ob = document.getElementById('obLayer');
 const S = { me: null, student: null, section: null, assigns: [], subs: {}, intake: null, ob: null, saving: false };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) : '');
 
-const me = await currentProfile().catch(() => null);
+let me = null;
+try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || me.role !== 'student') {
   location.replace(me ? homeFor(me.role) : '/giris#ogrenci');
   await new Promise(() => {});
@@ -21,7 +22,8 @@ async function load() {
     supabase.from('submissions').select('assignment_id, status, checklist, reflection, teacher_feedback, completed_at'),
     supabase.from('intake_responses').select('answers, completed').maybeSingle(),
   ]);
-  if (st.error || !st.data) throw new Error('Öğrenci kaydın bulunamadı. Öğretmenine söyle.');
+  if ([st, as, sb, ir].some((r) => r.error)) throw new Error('Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip yeniden dene.');
+  if (!st.data) throw new Error('Öğrenci kaydın bulunamadı. Öğretmenine söyle.');
   S.student = st.data;
   S.assigns = as.data || [];
   S.subs = Object.fromEntries((sb.data || []).map((x) => [x.assignment_id, x]));
@@ -199,6 +201,6 @@ try {
     obDraw();
   }
 } catch (err) {
-  app.innerHTML = `<div class="card"><div class="msg err">${esc(err.message)}</div><button class="btn" id="out2">Çıkış yap</button></div>`;
+  app.innerHTML = `<div class="card"><div class="msg err">${esc(err.message)}</div><div class="row"><button class="btn pri" onclick="location.reload()">Yeniden dene</button><button class="btn" id="out2">Çıkış yap</button></div></div>`;
   document.getElementById('out2').onclick = () => signOut('/giris#ogrenci');
 }
