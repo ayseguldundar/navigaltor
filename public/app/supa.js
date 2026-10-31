@@ -27,9 +27,15 @@ export async function callFn(name, body, { auth = false } = {}) {
 
 export async function rpc(fn, args) {
   const { data, error } = await supabase.rpc(fn, args);
-  if (error) throw new Error(error.message);
+  if (error) {
+    const duplicate = /duplicate key value violates unique constraint|unique constraint|already exists|zaten var/i.test(String(error.message ?? ''));
+    throw new Error(duplicate ? 'Bu ad zaten var. Farklı bir ad deneyin.' : 'İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.');
+  }
   return data;
 }
+
+export const dbError = (error, fallback = 'Veriler şu an yüklenemedi. Lütfen tekrar deneyin.') =>
+  error ? new Error(fallback) : null;
 
 export async function currentProfile() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -48,7 +54,16 @@ export const homeFor = (role) => (role === 'student' ? '/ogrenci' : role === 'pa
 export const ROLE_TR = { admin: 'Okul yöneticisi', teacher: 'Öğretmen', student: 'Öğrenci', parent: 'Veli' };
 
 export async function signOut(to = '/giris') {
-  await supabase.auth.signOut();
+  try {
+    await Promise.race([
+      supabase.auth.signOut(),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch { /* yerel auth durumu yine de temizlenir */ }
+  try { localStorage.removeItem('navigaitor-auth'); } catch { /* storage erişimi engellenmiş olabilir */ }
+  try {
+    Object.keys(sessionStorage).filter((k) => k.startsWith('navi-')).forEach((k) => sessionStorage.removeItem(k));
+  } catch { /* storage erişimi engellenmiş olabilir */ }
   location.href = to;
 }
 
@@ -67,7 +82,7 @@ export function changePasswordDialog(dlg, body) {
     const out = body.querySelector('#cpwMsg');
     if (a !== b) { out.innerHTML = '<div class="msg err">Şifreler aynı değil.</div>'; return; }
     const { error } = await supabase.auth.updateUser({ password: a });
-    if (error) { out.innerHTML = `<div class="msg err">${esc(/weak|short|least/i.test(error.message) ? 'Şifre çok kısa veya zayıf.' : /different|same/i.test(error.message) ? 'Yeni şifre eskisiyle aynı olamaz.' : error.message)}</div>`; return; }
+    if (error) { out.innerHTML = `<div class="msg err">${esc(/weak|short|least/i.test(error.message) ? 'Şifre çok kısa veya zayıf.' : /different|same/i.test(error.message) ? 'Yeni şifre eskisiyle aynı olamaz.' : 'Şifre değiştirilemedi. Lütfen tekrar deneyin.')}</div>`; return; }
     body.innerHTML = '<h2>Şifreniz değiştirildi</h2><p class="muted">Bir sonraki girişte yeni şifrenizi kullanın.</p><div class="row"><span class="sp"></span><button class="btn pri" data-close>Tamam</button></div>';
   });
 }

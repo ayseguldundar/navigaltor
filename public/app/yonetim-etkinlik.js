@@ -1,6 +1,6 @@
 // Yönetim konsolu → Etkinlikler: atamalar ve takip, etkinlik kütüphanesi, Claude ile üretim, taslaklar.
 // Etkinlik ekranları /app/kit-gorsel.js (renderEtkinlik, VIS) ile çizilir; kütüphane verisi ilk açılışta yüklenir.
-import { supabase, rpc, callFn, esc } from './supa.js';
+import { supabase, rpc, callFn, esc, dbError } from './supa.js';
 
 const COURSES = { MAT: 'Matematik', TUR: 'Türkçe', FEN: 'Fen Bilimleri', SOS: 'Sosyal Bilgiler', ING: 'İngilizce' };
 const LEVELS = [['destek', 'Desteğe ihtiyacı var'], ['orta', 'Sınıf düzeyinde'], ['ileri', 'İleri düzey']];
@@ -30,20 +30,23 @@ export function createEtkinlik(ctx) {
     if (!S.sec) { E.assigns = []; E.subs = []; return; }
     const { data, error } = await supabase.from('assignments').select('id, title, course, grade, source, template_id, due_date, created_at, archived, activity')
       .eq('section_id', S.sec).eq('archived', false).order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) { E.assigns = []; E.subs = []; throw dbError(error, 'Atamalar şu an yüklenemedi. Lütfen tekrar deneyin.'); }
     E.assigns = data;
     const ids = data.map((a) => a.id);
     if (ids.length) {
       const r = await supabase.from('submissions').select('assignment_id, student_id, status, checklist, reflection, teacher_feedback, completed_at').in('assignment_id', ids);
+      if (r.error) { E.subs = []; throw dbError(r.error, 'Öğrenci teslimleri şu an yüklenemedi. Lütfen tekrar deneyin.'); }
       E.subs = r.data || [];
     } else E.subs = [];
   }
   async function loadDrafts() {
-    const { data } = await supabase.from('teacher_activities').select('id, title, course, grade, source, created_at, activity, teacher_id').order('created_at', { ascending: false }).limit(60);
+    const { data, error } = await supabase.from('teacher_activities').select('id, title, course, grade, source, created_at, activity, teacher_id').order('created_at', { ascending: false }).limit(60);
+    if (error) { E.drafts = []; throw dbError(error, 'Taslaklar şu an yüklenemedi. Lütfen tekrar deneyin.'); }
     E.drafts = data || [];
   }
   async function loadGens() {
-    const { data } = await supabase.from('ai_generations').select('id, created_at, status, input_tokens, output_tokens, request, response').order('created_at', { ascending: false }).limit(20);
+    const { data, error } = await supabase.from('ai_generations').select('id, created_at, status, input_tokens, output_tokens, request, response').order('created_at', { ascending: false }).limit(20);
+    if (error) { E.gens = []; throw dbError(error, 'Üretim geçmişi şu an yüklenemedi. Lütfen tekrar deneyin.'); }
     E.gens = data || [];
   }
   async function load() {

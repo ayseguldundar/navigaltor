@@ -1,5 +1,5 @@
 // Öğretmen / okul yöneticisi konsolu: şubeler, öğrenci listesi ve PIN kartları, veli davetleri, öğretmen davetleri, yapay zekâ kayıtları.
-import { showOffline, supabase, rpc, callFn, currentProfile, signOut, ROLE_TR, esc, changePasswordDialog } from './supa.js';
+import { showOffline, supabase, rpc, callFn, currentProfile, signOut, ROLE_TR, esc, changePasswordDialog, dbError } from './supa.js';
 import { parseRoster } from './liste.js';
 import { createEtkinlik } from './yonetim-etkinlik.js';
 
@@ -44,7 +44,7 @@ async function loadStudents() {
     supabase.from('guardians').select('student_id'),
     supabase.from('invites').select('code, student_id, used_at, expires_at').eq('kind', 'parent').is('used_at', null).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
   ]);
-  if (st.error) throw new Error(st.error.message);
+  if (st.error || g.error || inv.error) { S.students = []; S.guardians = new Set(); S.invites = {}; throw dbError(st.error || g.error || inv.error); }
   S.students = st.data;
   S.guardians = new Set((g.data || []).map((x) => x.student_id));
   S.invites = {};
@@ -55,6 +55,7 @@ async function loadSchool() {
     supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'teacher', 'parent']).order('full_name'),
     supabase.from('invites').select('code, expires_at, created_at').eq('kind', 'teacher').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
   ]);
+  if (t.error || i.error) { S.teachers = []; S.parents = []; S.tinv = []; throw dbError(t.error || i.error); }
   S.teachers = (t.data || []).filter((x) => x.role !== 'parent'); S.parents = (t.data || []).filter((x) => x.role === 'parent'); S.tinv = i.data || [];
 }
 
@@ -284,6 +285,7 @@ async function studentDialog(id) {
     supabase.from('assignments').select('id, title, course, due_date, activity').eq('section_id', S.sec).eq('archived', false).order('created_at', { ascending: false }),
     supabase.from('submissions').select('assignment_id, status, checklist, completed_at, reflection').eq('student_id', id),
   ]);
+  if (ir.error || as.error || sb.error) throw dbError(ir.error || as.error || sb.error, 'Öğrenci ayrıntıları şu an yüklenemedi. Lütfen tekrar deneyin.');
   const ozet = ir.data ? window.tanismaOzet(ir.data.answers).filter((x) => x.a) : [];
   const skills = {};
   (as.data || []).forEach((a) => { const x = (sb.data || []).find((y) => y.assignment_id === a.id); if (x && x.status === 'tamamlandi') (a.activity.skills21 || []).forEach((k) => { skills[k] = (skills[k] || 0) + 1; }); });

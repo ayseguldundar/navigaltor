@@ -1,5 +1,5 @@
 // Öğrenci uygulaması (gerçek veri): Navi tanışma formu, görevlerim, etkinlik sayfası ve tamamlama.
-import { showOffline, supabase, rpc, currentProfile, homeFor, signOut, esc } from './supa.js';
+import { showOffline, supabase, rpc, currentProfile, homeFor, signOut, esc, dbError } from './supa.js';
 
 const COURSE = { MAT: ['Matematik', '#B3123A', '📐'], TUR: ['Türkçe', '#E07A2F', '📖'], FEN: ['Fen Bilimleri', '#1F9D6B', '🔬'], SOS: ['Sosyal Bilgiler', '#6A55C8', '🌍'], ING: ['İngilizce', '#2F7DD8', '💬'] };
 const app = document.getElementById('app');
@@ -22,13 +22,14 @@ async function load() {
     supabase.from('submissions').select('assignment_id, status, checklist, reflection, teacher_feedback, completed_at'),
     supabase.from('intake_responses').select('answers, completed').maybeSingle(),
   ]);
-  if ([st, as, sb, ir].some((r) => r.error)) throw new Error('Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip yeniden dene.');
+  if ([st, as, sb, ir].some((r) => r.error)) { S.student = null; S.assigns = []; S.subs = {}; S.intake = null; throw dbError(st.error || as.error || sb.error || ir.error, 'Görevlerin şu an yüklenemedi. Lütfen tekrar dene.'); }
   if (!st.data) throw new Error('Öğrenci kaydın bulunamadı. Öğretmenine söyle.');
   S.student = st.data;
   S.assigns = as.data || [];
   S.subs = Object.fromEntries((sb.data || []).map((x) => [x.assignment_id, x]));
   S.intake = ir.data || null;
   const sec = await supabase.from('sections').select('name, grade').eq('id', S.student.section_id).maybeSingle();
+  if (sec.error) { S.section = null; throw dbError(sec.error, 'Şube bilgilerin şu an yüklenemedi. Lütfen tekrar dene.'); }
   S.section = sec.data;
 }
 
@@ -112,7 +113,7 @@ function obDraw() {
         ${q.o.some((o) => window.isOther(o) && sel(o)) ? `<input class="in ob-in" id="obOther" placeholder="Yazmak istersen…" maxlength="80" value="${esc(a.other || '')}">` : ''}`;
     inner = `<div class="ob-top"><span class="ob-n">${i + 1} / ${Q.length}</span><span class="ob-bar"><i style="width:${((i + 1) / Q.length) * 100}%"></i></span><button class="btn sm" data-ob="later" aria-label="Sonra devam et">✕</button></div>
       <div class="ob-q"><div><h2 id="obT">${esc(q.q)}</h2>${q.h ? `<p class="ob-h">${esc(q.h)}</p>` : ''}</div></div>${opts}
-      <div class="ob-foot">${i > 0 ? '<button class="btn" data-ob="back">← Geri</button>' : '<span></span>'}<span class="sp"></span><button class="btn" data-ob="skip">Bu soruyu geç</button><button class="btn pri" data-ob="next">${i === Q.length - 1 ? 'Bitir' : 'Devam'} →</button></div>`;
+      <div class="ob-foot">${st.err ? `<div class="msg err" role="alert">${esc(st.err)} Cevapların korundu; tekrar deneyebilirsin.</div>` : ''}${i > 0 ? '<button class="btn" data-ob="back">← Geri</button>' : '<span></span>'}<span class="sp"></span><button class="btn" data-ob="skip">Bu soruyu geç</button><button class="btn pri" data-ob="next">${i === Q.length - 1 ? 'Bitir' : 'Devam'} →</button></div>`;
   }
   ob.innerHTML = `<div class="ob-scrim"></div><div class="ob-card" role="dialog" aria-modal="true" aria-labelledby="obT">${inner}</div>`;
   (ob.querySelector('#obTxt') || ob.querySelector('.ob-go') || ob.querySelector('.btn.pri'))?.focus();
@@ -128,8 +129,8 @@ function obCapture() {
   if (q.t === 'one' || q.t === 'multi') { /* seçimler tıklamada kaydedildi */ }
 }
 async function obPersist(completed) {
-  try { await rpc('save_intake', { p_answers: S.ob.a, p_completed: completed }); S.intake = { answers: { ...S.ob.a }, completed: completed || (S.intake && S.intake.completed) }; }
-  catch { /* ağ hatası: bir sonraki adımda yeniden denenir */ }
+  try { await rpc('save_intake', { p_answers: S.ob.a, p_completed: completed }); S.intake = { answers: { ...S.ob.a }, completed: completed || (S.intake && S.intake.completed) }; S.ob.err = ''; return true; }
+  catch { S.ob.err = 'Cevapların sunucuya kaydedilemedi.'; return false; }
 }
 ob.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-ob]');
@@ -148,10 +149,10 @@ ob.addEventListener('click', async (e) => {
     obDraw(); return;
   }
   obCapture();
-  if (act === 'next') { st.i += 1; await obPersist(st.i >= Q.length); obDraw(); }
-  else if (act === 'back') { st.i = Math.max(0, st.i - 1); obDraw(); }
-  else if (act === 'skip') { delete st.a[st.i]; st.i += 1; await obPersist(st.i >= Q.length); obDraw(); }
-  else if (act === 'later') { await obPersist(false); sessionStorage.setItem('navi-ob-later', '1'); S.ob = null; obDraw(); route(); }
+  if (act === 'next') { if (await obPersist(st.i + 1 >= Q.length)) st.i += 1; obDraw(); }
+  else if (act === 'back') { st.i = Math.max(0, st.i - 1); st.err = ''; obDraw(); }
+  else if (act === 'skip') { delete st.a[st.i]; if (await obPersist(st.i + 1 >= Q.length)) st.i += 1; obDraw(); }
+  else if (act === 'later') { if (await obPersist(false)) { sessionStorage.setItem('navi-ob-later', '1'); S.ob = null; obDraw(); route(); } else obDraw(); }
   else if (act === 'close') { S.ob = null; obDraw(); header(); route(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.ob && S.ob.i >= 0) ob.querySelector('[data-ob="later"]')?.click(); });
