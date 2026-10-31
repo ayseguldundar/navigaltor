@@ -18,7 +18,7 @@ Rol/tablo/RPC/Edge Function matrisi [ACCESS-MATRIX.md](ACCESS-MATRIX.md)'de; sta
 
 ## Bu dalda yapılan işler
 
-- Ayrı yerel dal: `pilot-readiness/2026-10-31`, başlangıç `main` commit'i `32bbd225d7efc94b93a5a2cb137d4c4000fccb93`. Değişiklikler henüz commit/push/PR değil.
+- Ayrı dal `pilot-readiness/2026-10-31`, `main` başlangıcı `32bbd225d7efc94b93a5a2cb137d4c4000fccb93`; commit `a7208846cfbdf6acad8ea2662792c121af8f33a7` push edildi. [Draft PR #2](https://github.com/ayseguldundar/navigaltor/pull/2) açıldı; `main`'e merge edilmedi.
 - Yeni `0008` migration ve buna bağlı Edge Function kullanımı: atomik fail-closed hız sınırı ve günlük AI kota rezervasyonu.
 - Yeni `0009` migration: öğretmenlerin okul içi profil ve diğer öğretmen şube atama listelerini doğrudan okumasını daraltma.
 - AI Edge Function: tip/uzunluk/izinli değer kontrolleri, toplam gövde/prompt sınırı, hassas örüntü reddi, bounded response, strict output schema, sabit hata mesajları ve öğretmen onayı öncesi taslak akışı.
@@ -66,11 +66,10 @@ Build ölçümünde demo paneller 1.09–1.59 MB ve eski kütüphane modülü 74
 
 Staging frontend için `SUPABASE_URL` ve `SUPABASE_PUBLISHABLE_KEY`; Supabase işlemleri için proje ref'i ve yetkili CLI erişimi/DB parola yönetimi; AI Function için `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT`; Auth doğrulaması için staging SMTP/redirect ayarları gerekir. Bu raporda hiçbir gizli değer bulunmaz. Production için ayrı proje/ref, secrets ve açık deploy/migration onayı şarttır.
 
-İstenen GitHub PR'ı açılmadı; bu ortamda yazma yetkili GitHub bağlantısı henüz kullanılabilir değil. Dal yerelde duruyor, main'e birleştirilmedi ve push edilmedi. Staging'e migration/deploy de yapılmadı.
+GitHub üzerinden dal push edildi ve [Draft PR #2](https://github.com/ayseguldundar/navigaltor/pull/2) açıldı. PR açık blokajları listeler; merge edilmedi. Staging'e migration/deploy de yapılmadı.
 
 ## Gerekli kısa kararlar
 
 1. Şube açma yetkisi öğretmenlerde de kalsın mı, yalnızca okul yöneticisinde mi olsun? Mevcut `create_section` tüm okul personeline izin veriyor.
 2. Staging Supabase projesi/ref'i mevcut mu; yoksa ayrı staging oluşturulmasına onay veriyor musunuz? Production'a dokunulmayacak.
-3. GitHub bağlantısı yazma/PR izniyle etkinleştirilebilir mi? PR için gerekir.
-4. SMTP/Auth e-posta doğrulaması hangi sağlayıcıyla kurulacak? Bu çözülene kadar gerçek hesap kaydı güvenli değil.
+3. SMTP/Auth e-posta doğrulaması hangi sağlayıcıyla kurulacak? Bu çözülene kadar gerçek hesap kaydı güvenli değil.
