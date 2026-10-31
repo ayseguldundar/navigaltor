@@ -1,78 +1,76 @@
-# NavigAItor — pilot hazırlık raporu
+# NavigAItor — CTO pilot hazırlık raporu
 
-_30 Ekim 2026 · Kapsam: tek okul, gözetimli pilot (birkaç öğretmen, 1–3 şube, 30–90 öğrenci ve velileri)_
+**Karar: pilot için teknik olarak hazır olduğu henüz söylenemez.** Gerçek staging Supabase projesi/Edge Function testi yok; ayrıca öğretmen/veli kayıt kodu e-postayı doğrulanmış gibi işaretliyor. Bu çalışma production'a migration, kullanıcı verisi değişikliği veya yayın yapmadı.
 
-## Karar
+## Doğrulanan önemli bulgular
 
-**Gözetimli pilot için yeterli.** Bunun iki koşulu var: aşağıdaki "Pilottan önce sizin yapmanız gerekenler" listesi tamamlanmalı ve ilk gün okulda kısa bir toplu giriş denemesi yapılmalı.
+- `/yonetim`, `/ogrenci`, `/veli` gerçek uygulama uçları Supabase/Auth/RLS/RPC kodunu kullanıyor; `/demo` ise ayrı, kurgusal localStorage demosu. Mock Playwright sonuçları gerçek veritabanı kanıtı değil.
+- Kaynakta `profiles` RLS politikası öğretmenlere aynı okuldaki bütün profilleri; `teacher_sections` politikası tüm personel atamalarını açıyordu. Yeni `20261031000009_profile_isolation.sql` öğretmene yalnızca kendi profil/atamalarını, yöneticiye okul çapındaki listeyi bırakıyor. Migration henüz uygulanmadı.
+- Öğretmen daveti kaynakta tek kullanımlı, 7 gün geçerli; yenisi oluşturulunca önceki kullanılmamış kod iptal ediliyor. Veli daveti tek kullanımlı ve varsayılan 30 gün geçerli. Kayıt fonksiyonları daveti `FOR UPDATE` ile tüketiyor.
+- `kayit-ogretmen` ve `kayit-veli`, Supabase Auth kullanıcılarını `email_confirm: true` ile oluşturuyor. Gerçek e-posta sahipliği kanıtı olmadan doğrulanmış hesap yaratılması, SMTP/Auth doğrulama akışı çözülene kadar pilot blokajıdır.
+- Öğrenci giriş roster'ı sınıf kodunu bilenlere isim etiketiyle beraber öğrenci UUID'si döndürüyor. `srv_class_roster` doğrudan yalnızca `service_role` içindir; fakat herkese açık Edge Function bu içeriği tarayıcıya geçiriyor. UUID'yi tarayıcıya taşımayan kısa ömürlü bir bilet tasarımı gerekir.
+- Hız sınırı ve AI kota rezervasyonu için `20261031000008_atomic_limits.sql` aynı bucket/global quota üzerinde transaction lock kullanıyor; Edge Function'lar hata halinde fail-closed davranacak şekilde güncellendi. Ancak kullanılan `x-forwarded-for` değerinin Supabase gateway'den güvenilir geldiği doğrulanmadı; SQL atomikliği tek başına IP kaynağını güvenilir yapmaz.
+- AI Edge Function istek gövdesi/prompt boyutunu ve izinli alanları sınırlar, e-posta/telefon/TC kimlik benzeri örüntüleri reddeder, çıktıyı katı JSON/visual schema ile doğrular ve ham prompt/yanıtı AI tablosuna yazmaz. Ad, adres veya dolaylı tanımlayıcıları regex kusursuz yakalayamaz; serbest metin sağlayıcıya gider. Pedagojik doğruluk iddiası yoktur; taslak öğrenciye atanmadan öğretmen onayı ister.
+- Service worker statik kabuk ve dosyaları önbelleğe alır; Supabase verisi/yazması çevrimdışı kuyruklanmıyor. Kaydetme hatası görünür, ancak sekme/yenileme sonrası cihazlar arası taslak/çatışma çözümü garanti edilmez. Pilot işlemleri çevrimiçi yapılmalıdır.
+- Eski `/demo` rapor paylaşımı gerçek gönderim gibi görünmeyecek şekilde “simülasyon (demo)” olarak etiketlendi; notun yalnızca demo localStorage'ına gittiği açıklanıyor. Mock smoke testi veli mesajlaşmasının kapalı olduğunu doğruladı.
 
-Ürünün çekirdek döngüsü uçtan uca çalışıyor ve sınandı:
+Rol/tablo/RPC/Edge Function matrisi [ACCESS-MATRIX.md](ACCESS-MATRIX.md)'de; staging işletim kapıları [PILOT.md](PILOT.md)'de bulunur.
 
-1. Öğretmen etkinlik atar (kütüphaneden ya da Claude ile üreterek).
-2. Öğrenci telefonundan girer ve etkinliği tamamlar.
-3. Öğretmen ilerlemeyi görür ve geri bildirim yazar.
-4. Veli çocuğunun çalışmasını ve öğretmen notunu görür.
+## Bu dalda yapılan işler
 
-Bağımsız incelemenin bulduğu engelleyici güvenlik açığı kapatıldı. Kalan riskler bilinen ve yönetilebilir türden.
+- Ayrı yerel dal: `pilot-readiness/2026-10-31`, başlangıç `main` commit'i `32bbd225d7efc94b93a5a2cb137d4c4000fccb93`. Değişiklikler henüz commit/push/PR değil.
+- Yeni `0008` migration ve buna bağlı Edge Function kullanımı: atomik fail-closed hız sınırı ve günlük AI kota rezervasyonu.
+- Yeni `0009` migration: öğretmenlerin okul içi profil ve diğer öğretmen şube atama listelerini doğrudan okumasını daraltma.
+- AI Edge Function: tip/uzunluk/izinli değer kontrolleri, toplam gövde/prompt sınırı, hassas örüntü reddi, bounded response, strict output schema, sabit hata mesajları ve öğretmen onayı öncesi taslak akışı.
+- Gerçek panellerde veri hatalarının sahte başarıya dönüşmemesi ve oturum çıkışında yerel auth/Navi session verilerinin temizlenmesi; uzak logout 1,5 saniyede tamamlanmazsa yerel temizlik yine yapılır.
+- Node 22, lockfile, Playwright CI ve static syntax kontrolü. Playwright 1.48.0 için audit yüksek önem uyarısı verdi; 1.64.1'e yükseltildi, audit artık 0 bulgu raporluyor.
+- README, Faz 1, yol haritası ve pilot runbook'ları mock/staging kanıt sınırlarını açıkça ayıracak şekilde güncellendi.
 
-## Ne yapıldı
+## Test kanıtı
 
-| Alan | Durum |
-|---|---|
-| Ana sayfa (`/`) | Wix tasarımı yayında; giriş ve demo bağlantıları eklendi |
-| Giriş (`/giris`) | Öğretmen kaydı (okul açma / davet kodu), öğrenci sınıf kodu + isim + PIN, veli davet kodu + KVKK açık rıza |
-| Yönetim konsolu (`/yonetim`) | Şubeler, öğrenci listesi (Excel'den yapıştırma), PIN kartları, veli davetleri, öğretmen davetleri, etkinlik atama ve takip, Claude ile üretim, taslaklar, şifre işlemleri, KVKK silme, şube değiştirme, ikinci yönetici |
-| Öğrenci uygulaması (`/ogrenci`) | Navi tanışma formu, görevlerim, etkileşimli etkinlik sayfası, kontrol listesi, "ne öğrendin" notu, öğretmen geri bildirimi |
-| Veli uygulaması (`/veli`) | Çocukların etkinlikleri, çalışılan 21. yy becerileri, öğretmen notları, evde destek önerisi, çocuk ekleme. Karşılaştırma ve sıralama yok |
-| Claude ile üretim | Canlıda 3 kez denendi (7. sınıf Matematik, 6. sınıf Fen, 5. sınıf Türkçe). İçerik özgün, kazanım kodu yok, düzeye uygun. Bir üretim 35–45 sn sürüyor |
-| Veritabanı | Supabase (AB-Frankfurt), satır düzeyi güvenlik, tüm yazma işlemleri yetki denetimli sunucu fonksiyonlarıyla. 6 göç dosyası uygulandı |
-| Testler | `npm test`: duman testi (22 kontrol), uçtan uca akış testi (70 kontrol), güvenlik (XSS) testi. Tamamı geçiyor |
-
-## Eleştirel inceleme: bulgular ve sonuçları
-
-Bu çalışmayı görmemiş ayrı bir değerlendirici kodu inceledi. Bulgular ve yapılanlar:
-
-| Önem | Bulgu | Durum |
+| Kontrol | Sonuç | Kanıtın sınırı |
 |---|---|---|
-| Engelleyici | Etkinlik görsellerinde zararlı içerik (XSS): bir öğretmen hesabından öğrenci, veli ve yönetici oturumları ele geçirilebiliyordu | **Kapatıldı.** Görsel parametreleri temizleniyor; `eval` yerine güvenli hesaplayıcı var; tarayıcı güvenlik politikası (CSP) yayında; yapay zekâ çıktısı sunucuda da temizleniyor. Yeni güvenlik testi açığı yakalıyor ve düzeltmeyi doğruluyor |
-| Engelleyici | Okul ağında herkes aynı IP'den bağlandığı için hız sınırları toplu girişi kilitleyebilirdi | **Düzeltildi.** Öğrenci girişi sınıf kodu başına sınırlanıyor ve sınırlar okul ölçeğine göre genişletildi. Asıl koruma öğrenci başına PIN kilidi. **Canlı yük testi yapılmadı** (aşağıya bakın) |
-| Yüksek | Öğretmen davet kodu çok kullanımlıktı; her öğretmen tüm davet kodlarını görebiliyordu | **Düzeltildi.** Kod tek kullanımlık, 7 gün geçerli; yeni kod eskisini geçersiz kılıyor; davetleri yalnızca yönetici ve ilgili öğretmen görüyor. Canlıda sınandı |
-| Yüksek | Şifre veya PIN yenilenince açık oturumlar kapanmıyordu | **Kısmen.** Kod hazır, ancak veritabanı değişikliği Supabase'in onay penceresinde iki kez iptal oldu ve uygulanmadı (`20261029000007_oturum_iptali.sql`). Arayüz şimdilik "oturum açık kalabilir" diyor |
-| Yüksek | PIN tahmini: kilit her seferinde sıfırlanıyordu | **Düzeltildi.** Kilit kademeli artıyor (15 dk → 30 dk → 1 sa … en çok 4 sa). Canlıda sınandı |
-| Yüksek | Yapay zekâ maliyeti sınırsız; kota hatasında üretim sürüyordu | **Düzeltildi.** Kota hatasında üretim durur; sistem geneli günlük 300 sınırı var. **Anthropic konsolunda harcama sınırını siz koymalısınız** |
-| Yüksek | Okulun tek yöneticisi şifresini unutursa kimse işlem yapamıyordu | **Düzeltildi.** İkinci yönetici atanabiliyor; son yönetici düşürülemiyor. Kılavuza kurtarma adımı eklendi |
-| Orta | Aynı ad ve soyad baş harfli öğrenciler listede ayırt edilemiyordu | **Düzeltildi** ("Zeynep Kar." / "Zeynep Kay."; gerekirse okul no) |
-| Orta | Veli ekranında KVKK metni okunamıyordu; metin yurt dışı yapay zekâ hizmetinden söz etmiyordu | **Düzeltildi.** Metin her iki ekranda okunuyor; Anthropic'e (ABD) yalnızca ders, kazanım ve öğretmen notu gittiği yazıyor; rızanın geri alınması açıklandı |
-| Orta | Öğrenci şube değiştiremiyordu; PIN kartları kaybolunca toplu çözüm yoktu | **Düzeltildi** ("Şube değiştir", "Tüm PIN'leri yenile") |
-| Orta | Ağ kesintisi öğrenciyi giriş ekranına atıyordu | **Düzeltildi.** "Yeniden dene" ekranı çıkıyor, oturum korunuyor |
-| Orta | Yeni sürümden sonra eski kod çalışabiliyordu; ilk açılışta yaklaşık 2 MB iniyordu | **Düzeltildi.** Uygulama kodu önce ağdan alınıyor; demo panelleri önceden indirilmiyor |
-| Orta | Öğrenci silme yarıda kalırsa yeniden denenemiyordu | **Düzeltildi.** Önce giriş hesapları siliniyor |
-| Düşük | Haber kartı görseli bozuktu; diğer satırlara yazılan geri bildirim kayboluyordu; sunucu ham veritabanı hatası döndürüyordu; yanlış çocuk seçiliyordu | **Düzeltildi** |
+| Node sürümü | Node 22.23.4 | `.nvmrc` ve CI Node 22 ile uyumlu |
+| Temiz kurulum | `npm ci` başarılı | `package-lock.json` üzerinden, yeni klon davranışına yakın |
+| Playwright | 1.64.1, Chromium kuruldu | npm audit eski 1.48.0 açığını sabitledikten sonra 0 bulgu |
+| `npm test` | Build, 16 JS + 7 Edge Function TS syntax-only check, demo smoke, mock auth, XSS geçti | Gerçek Supabase/Anthropic değil; Deno API/type-check değil |
+| Edge Function parser | Node 22 `--experimental-strip-types --check` tüm Edge Function `.ts` dosyalarında geçti | Bu yalnızca syntax kontrolü; Deno API/type-check veya deploy değildir |
+| `git diff --check` | Final kontrol geçti | Whitespace/merge-marker kontrolü; çalışma zamanı testi değildir |
+| Gerçek staging RLS/Edge testleri | Çalıştırılmadı | Staging proje/branch yok; bu nedenle kabul kriterleri 1–7 staging açısından tamamlanmış sayılmaz |
 
-### Açık kalan bulgular
+Build ölçümünde demo paneller 1.09–1.59 MB ve eski kütüphane modülü 749 KB görünür; gerçek route HTML'leri 2.8–3.9 KB, ana sayfa modülleri yaklaşık 9–30 KB'dır. Büyük etkinlik kütüphanesi gerektiğinde ayrı yüklenir. Bu çalışma bundle küçültme yapmadı; gerçek ilk açılış için laboratuvar performans ölçümü veya before/after iddiası üretilmedi.
 
-- **Oturum iptali uygulanmadı.** Supabase onayı bekliyor; ayrıntı yukarıdaki tabloda.
-- **Öğretmeni şubeden çıkarma yok.** Aynı onaya bağlı. Okuldan ayrılan öğretmen için geçici çözüm: yönetici şifresini sıfırlar ve kişiye iletmez.
-- **Veli hesabını doğrulama yok.** Davet kodunu bilen herkes "veli" olarak kaydolabilir. Öğretmen yalnızca "✓ bağlı" görüyor; kimin bağlandığını görmüyor. Pilotta davet kodlarını veliye elden veya veli toplantısında verin.
-- **Yedekleme ve izleme yok.** Supabase planı doğrulanamadı. Ücretsiz plandaysa proje 7 gün kullanılmazsa durur ve indirilebilir yedek yoktur. Hata izleme (Sentry vb.) kurulu değil.
-- **Veritabanı kuralları otomatik testte yok.** Gerçek SQL ve yetki kuralları otomatik testlerde değil, canlı veritabanında elle sınandı.
-- **Küçük konular:**
-  - Öğretmen geri bildirimi, başlanmamış etkinliği "devam ediyor" gösterebiliyor.
-  - Hem öğretmen hem veli olan kişi iki ayrı e-posta kullanmalı.
-  - Kütüphane veri dosyasında kazanım kodları duruyor. Ekranda görünmüyorlar, yalnızca geliştirici araçlarıyla okunabiliyorlar.
+## Kabul ölçütleri durumu
 
-## Pilottan önce sizin yapmanız gerekenler
+1. Yönetici→öğretmen→öğrenci, ayrı cihaz hesabı: UI/mock akışında var; staging kanıtı yok.
+2. Atama→öğrenci teslimi→öğretmen ilerlemesi: UI/mock akışında var; gerçek DB/staging kanıtı yok.
+3. Veli yalnız bağlı çocuğu: RLS kaynağı ve tek kullanımlı davet akışı var; negatif staging testi yok.
+4. Başka okul/şube/öğrenci/veli izolasyonu: kaynak politikalar ve `0009` düzeltmesi var; `0009` uygulanmadı, gerçek RLS testi yok.
+5. Yanlış PIN/davet, rate limit, paralel kota, logout: SQL/Edge kaynakları güncellendi; gerçek eşzamanlı DB testi yok, `x-forwarded-for` güveni açık.
+6. AI hataları/rol/girdi/kota/bozuk çıktı: kodda fail-closed kontroller var; sağlayıcı/staging entegrasyon testi yok.
+7. `npm test`: geçti; gerçek staging testi yapılmadığı için kabul ölçütünün staging kısmı eksik.
+8. Temiz Node 22 kurulum: `npm ci` ve testler geçti; CI tanımlı. Edge Function TypeScript kontrolü syntax-only.
+9. Demo olmayan/gerçek olmayan kapsam: `/demo` ve çevrimdışı sınırlar dokümante edildi; gerçek mesaj/rapor paylaşımı yok ve demo düğmesi simülasyon diye etiketli.
 
-1. **Siteye herkesin erişebildiğini doğrulayın.** https://navigaltor.vercel.app/giris adresini gizli pencerede açın. Vercel giriş ekranı çıkarsa: Vercel → Project → Settings → Deployment Protection → Vercel Authentication'ı kapatın. Benim ortamım siteye dışarıdan erişemediği için bunu doğrulayamadım.
-2. **Supabase onayı verin.** Bir sonraki denememde çıkan pencereyi onaylayın. Bu adım oturum iptalini ve öğretmen çıkarmayı etkinleştirir.
-3. **Anthropic konsolunda aylık harcama sınırı koyun.** Örneğin 50 $; pilot için yeterli.
-4. **Supabase planını ve yedekleri kontrol edin.** Pilot süresince Pro plan önerilir; durmaz ve günlük yedek alır.
-5. **İlk gün toplu giriş denemesi yapın.** Bir sınıfın aynı anda giriş yapmasını izleyin. Sorun çıkarsa bana söyleyin; sınırları yükseltirim.
-6. **KVKK metnini hukuk danışmanına onaylatın.** Metin hâlâ "taslak" ibaresi taşıyor.
-7. **Test verisini temizleyin.** "YZ Test Okulu (test)" ve "Pilot Test Okulu (test)" ile iki test hesabı duruyor. Silmek için Supabase onayı gerekiyor; isterseniz silerim.
+## Pilota giriş için şartlar
 
-## Ölçüm önerisi (pilot boyunca)
+1. Ayrı staging Supabase projesi ya da mevcut staging ref'i sağlanmalı; `0001`–`0009` migration'ları staging'de sırayla uygulanmalı ve migration geçmişi doğrulanmalı.
+2. E-posta doğrulama/SMTP Auth akışı kurulmalı; doğrulanmamış öğretmen/veli hesabı yetkili kabul edilmemeli.
+3. `0009` sonrası rol/okul/şube/öğrenci/veli RLS pozitif-negatif senaryoları ve sınıf roster/yanlış PIN/kilit/davet tekrar kullanım testleri gerçek staging'de çalıştırılmalı.
+4. Gateway'deki gerçek istemci IP kaynağı teyit edilmeli; teyit edilemiyorsa rate limit için güvenilir gateway başlığı veya platform koruması seçilmeli.
+5. Öğrenci UUID'si anonim tarayıcıya taşınmadan roster/login akışı test edilmeli.
+6. Edge Function'lar staging'e deploy edilmeli; AI key, model, günlük/global kota ve staging CORS/Auth ayarları doğrulanmalı.
+7. Backup/restore provası, health-check, hata izleme, migration rollback/forward-fix, geri dönüş sorumlusu ve üretim onay kapısı tamamlanmalı.
 
-- **Haftalık:** atanan / tamamlanan etkinlik oranı, ilk 10 dakikada giriş yapabilen öğrenci oranı, öğretmen başına üretim sayısı.
-- **Öğretmenden:** "Claude taslağını değiştirmeden atadım / düzelttim / attım" geri bildirimi. Bu, üretim kalitesinin en doğrudan göstergesi.
-- **İkinci haftada:** 3–5 veliyle kısa görüşme; veli ekranı anlaşılıyor mu?
+## Değişkenler ve onaylar
+
+Staging frontend için `SUPABASE_URL` ve `SUPABASE_PUBLISHABLE_KEY`; Supabase işlemleri için proje ref'i ve yetkili CLI erişimi/DB parola yönetimi; AI Function için `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT`; Auth doğrulaması için staging SMTP/redirect ayarları gerekir. Bu raporda hiçbir gizli değer bulunmaz. Production için ayrı proje/ref, secrets ve açık deploy/migration onayı şarttır.
+
+İstenen GitHub PR'ı açılmadı; bu ortamda yazma yetkili GitHub bağlantısı henüz kullanılabilir değil. Dal yerelde duruyor, main'e birleştirilmedi ve push edilmedi. Staging'e migration/deploy de yapılmadı.
+
+## Gerekli kısa kararlar
+
+1. Şube açma yetkisi öğretmenlerde de kalsın mı, yalnızca okul yöneticisinde mi olsun? Mevcut `create_section` tüm okul personeline izin veriyor.
+2. Staging Supabase projesi/ref'i mevcut mu; yoksa ayrı staging oluşturulmasına onay veriyor musunuz? Production'a dokunulmayacak.
+3. GitHub bağlantısı yazma/PR izniyle etkinleştirilebilir mi? PR için gerekir.
+4. SMTP/Auth e-posta doğrulaması hangi sağlayıcıyla kurulacak? Bu çözülene kadar gerçek hesap kaydı güvenli değil.

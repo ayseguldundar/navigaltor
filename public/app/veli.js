@@ -1,6 +1,6 @@
 // Veli uygulaması (gerçek veri): bağlı çocuklar, atanan ve tamamlanan etkinlikler, çalışılan beceriler, çocuk ekleme.
 // Karşılaştırma ve sıralama gösterilmez; yalnızca çocuğun kendi gelişimi.
-import { showOffline, supabase, callFn, currentProfile, homeFor, signOut, esc, changePasswordDialog } from './supa.js';
+import { showOffline, supabase, callFn, currentProfile, homeFor, signOut, esc, changePasswordDialog, dbError } from './supa.js';
 import { KVKK } from './kvkk.js';
 
 const COURSE = { MAT: 'Matematik', TUR: 'Türkçe', FEN: 'Fen Bilimleri', SOS: 'Sosyal Bilgiler', ING: 'İngilizce' };
@@ -26,6 +26,7 @@ async function load() {
     supabase.from('submissions').select('assignment_id, student_id, status, checklist, reflection, teacher_feedback, completed_at'),
     supabase.from('sections').select('id, name'),
   ]);
+  if (k.error || a.error || s.error || sec.error) { S.kids = []; S.assigns = []; S.subs = []; S.sections = {}; throw dbError(k.error || a.error || s.error || sec.error, 'Çocuk ve etkinlik bilgileri şu an yüklenemedi. Lütfen tekrar deneyin.'); }
   S.kids = k.data || [];
   S.assigns = a.data || [];
   S.subs = s.data || [];

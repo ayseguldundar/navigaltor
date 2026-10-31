@@ -17,9 +17,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
 const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
-const allowed = async (bucket: string, max: number, windowSec: number) => {
+const allowed = async (bucket: string, max: number, windowSec: number): Promise<boolean | null> => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
+  return error ? null : data === true;
 };
 
 Deno.serve(async (req) => {
@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
   const code = String(body.classCode ?? '').trim().toUpperCase();
   if (!/^[A-Z0-9]{6}$/.test(code)) return fail('Sınıf kodu 6 karakter olmalı.');
   // Okul ağında birçok öğrenci aynı IP'den bağlanır; sınır buna göre geniş tutuldu.
-  if (!(await allowed('ogrenci-sinif:' + clientIp(req), 900, 600))) {
+  const rateAllowed = await allowed('ogrenci-sinif:' + clientIp(req), 900, 600);
+  if (rateAllowed === null) return fail('Şu an sınıf bilgisi alınamıyor.', 503);
+  if (!rateAllowed) {
     return fail('Çok fazla deneme. Birkaç dakika sonra yeniden deneyin.', 429);
   }
   const { data, error } = await admin.rpc('srv_class_roster', { p_code: code });

@@ -1,49 +1,52 @@
-# Faz 1 — Hesaplar, roller ve gerçek yapay zekâ ucu
+# Faz 1 — Hesaplar, roller ve gerçek uygulama uçları
 
 ## Mimari
 
 | Katman | Nerede | Ne yapar |
 |---|---|---|
-| Sayfalar | Vercel (`public/`, `src/`) | `/giris`, `/yonetim`, üç panel |
-| Veritabanı | Supabase Postgres, eu-central-1 (Frankfurt) | `supabase/migrations/*.sql` |
-| Sunucu fonksiyonları | Supabase Edge Functions | `supabase/functions/*` |
-| Yapay zekâ | Claude (Anthropic API), yalnızca `yz-etkinlik` fonksiyonundan | Anahtar Supabase gizli değişkeninde; tarayıcıya inmez |
+| Eski demo | `/demo`, `src/js/04-core.js` | localStorage üzerinde kurgusal panel akışları; gerçek hesap/veritabanı kullanmaz |
+| Gerçek uygulama sayfaları | `/giris`, `/yonetim`, `/ogrenci`, `/veli`; `public/app/*.js` | Supabase Auth ve uygulama RPC/REST köprüleriyle hesaplı akışlar |
+| Veritabanı | Supabase Postgres; migration kaynakları `supabase/migrations/` | Şema, RLS ve RPC tanımları |
+| Sunucu fonksiyonları | Supabase Edge Functions; `supabase/functions/` | Yetkili işlemler ve yapay zekâ çağrısı |
+| Yapay zekâ | Claude, `yz-etkinlik` fonksiyonu üzerinden | Anahtarın tarayıcıya inmemesi hedeflenir |
+
+Bu belgede kaynak kodda bulunan yapı ile gerçekten uygulanmış/çalıştırılmış ortam birbirinden ayrıdır. Bu checkout'ta staging Supabase projesi, canlı RLS/RPC davranışı veya migration uygulama kaydı bulunmadığı için bunlar doğrulanmış kabul edilmez. `20261029000007_oturum_iptali.sql` migration'ının production'da uygulandığı özellikle doğrulanmadı.
 
 ## Roller ve giriş
 
-| Rol | Nasıl hesap açılır | Nasıl giriş yapar |
-|---|---|---|
-| Okul yöneticisi | `/giris` → Öğretmen → "Okulumu ilk kez ekliyorum" | E-posta + şifre |
-| Öğretmen | Yöneticinin verdiği 8 karakterlik okul davet kodu | E-posta + şifre |
-| Öğrenci | Öğretmen listeyi yapıştırır; sistem 4 haneli PIN üretir | Sınıf kodu (6 karakter) → adını seçer → PIN |
-| Veli | Öğretmenin öğrenci için ürettiği tek kullanımlık davet kodu + KVKK açık rıza | E-posta + şifre |
+| Rol | Tasarlanan akış |
+|---|---|
+| Okul yöneticisi | `/giris` → öğretmen → okul oluşturma → e-posta + şifre |
+| Öğretmen | Okul davet kodu → e-posta + şifre |
+| Öğrenci | Sınıf kodu → isim → PIN |
+| Veli | Öğrenci davet kodu ve açık rıza → e-posta + şifre |
 
-## Güvenlik kuralları (veritabanında zorlanır)
+Gerçek uygulama kodu bu akışlar için Supabase istemcisi ve RPC/Edge Function çağrıları içerir. `npm test` bunları gerçek Supabase yerine `tests/mock-supabase.mjs` ile taklit eder; bu nedenle test geçmesi canlı RLS kanıtı değildir.
 
-- İstemci tablolara **yazamaz**; tüm değişiklikler yetki denetimli fonksiyonlardan geçer.
-- Öğretmen yalnızca atandığı şubelerin öğrencilerini, yönetici kendi okulunun tamamını görür; başka okul hiçbir şey görmez.
-- Öğrenci yalnızca kendi kaydını, veli yalnızca bağlı olduğu çocuğu görür.
-- PIN'ler yalnızca bcrypt özeti olarak saklanır ve hiçbir istemci rolü okuyamaz. 5 hatalı denemede 15 dakika kilit.
-- Kayıt ve giriş uçlarında IP başına hız sınırı vardır.
-- Yapay zekâ ucu: yalnızca öğretmen/yönetici, günlük kota (varsayılan 40, `AI_DAILY_LIMIT`), öğrenci adı gönderilmez, kazanım kodları çıktıdan temizlenir, her üretim `ai_generations` tablosuna token sayısıyla kaydedilir.
+## Güvenlik hedefleri (kaynak migration/fonksiyonlarda)
+
+- İstemci yazmaları yetki denetimli RPC/Edge Function akışlarından geçmelidir.
+- Öğretmen yalnızca atanmış şubeleri, yönetici kendi okulunu, öğrenci kendi kaydını ve veli bağlı çocuğunu görmelidir.
+- PIN özeti, kilitleme, hız sınırı ve yapay zekâ kota kontrolleri sunucu tarafında uygulanmalıdır.
+- Yapay zekâ isteğinde öğrenci adı/kimliği gönderilmemeli ve üretim kayıt altına alınmalıdır.
+
+Bu maddelerin staging veya production RLS/RPC yürütme kanıtı bu checkout'ta yoktur; manuel pilot kapıları tamamlanmadan doğrulanmış güvenlik sonucu olarak raporlanmamalıdır.
 
 ## Yapılandırma
 
-| Gizli değişken (Supabase → Edge Functions → Secrets) | Zorunlu | Açıklama |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Evet | Claude API anahtarı. Yoksa panel "anahtar eksik" der, demo modu çalışmaya devam eder |
-| `ANTHROPIC_MODEL` | Hayır | Varsayılan `claude-sonnet-5-5` |
-| `AI_DAILY_LIMIT` | Hayır | Öğretmen başına günlük üretim sınırı, varsayılan 40 |
+`public/config.js` içindeki proje adresi ve yayımlanabilir anahtarın tarayıcıda bulunması beklenen tasarımdır. Gizli anahtarlar yalnızca staging/production Edge Function ortamında yapılandırılmalıdır; bu görev kapsamında secret kullanılmadı.
 
-`public/config.js` içindeki proje adresi ve yayımlanabilir anahtar herkese açık olacak şekilde tasarlanmıştır.
+## Testler ve kanıt kapsamı
 
-## Testler
+- `npm test`: build ardından Playwright smoke, auth ve XSS testlerini yerel sunucuda çalıştırır.
+- Smoke testi `/demo` localStorage panelini sınar.
+- Auth testi `/giris`, `/yonetim`, `/ogrenci`, `/veli` yollarını Supabase mock'u ile sınar.
+- XSS testi yerel etkinlik görüntüleyicisini sınar.
+- Önceki test kontrol sayıları ve canlı akış/RLS başarı iddiaları bu checkout'ta bağımsız doğrulanmadı; kanıtlanmış sonuç olarak kullanılmamalıdır.
 
-- `tests/auth-flows.mjs` — 30 kontrol: kayıt, şube, öğrenci içe aktarma ve PIN kartları, veli daveti ve açık rıza, öğrenci PIN girişi, yetki yönlendirmeleri, panelde yapay zekâ köprüsü (Supabase istekleri taklit edilir).
-- Sunucu tarafı canlı projede ayrıca sınandı: kayıt → şube → içe aktarma → sınıf listesi → yanlış/doğru PIN → veli kaydı → yapay zekâ ucunun yetki ve anahtar kontrolleri; başka okulun veri görememesi.
+## Bilinen sınırlar
 
-## Bilinen sınırlar (Faz 2'de)
-
-- Paneller hâlâ demo verisi gösteriyor; giriş yapan kişinin adı oturum rozetinde görünür ama sınıf listesi, atamalar ve ölçümler henüz veritabanından gelmiyor.
-- Şifre sıfırlama e-postası için Supabase'e özel SMTP tanımlanmalı (varsayılan e-posta servisi yalnızca proje ekibine gönderir).
-- KVKK aydınlatma metni taslaktır; pilot öncesi hukuk danışmanına onaylatılmalı.
+- Gerçek staging projesi ve staging RLS/RPC testi mevcut değil/doğrulanmadı.
+- Migration'ların hangi ortamda uygulandığı, özellikle `0007` migration'ı, doğrulanmadı.
+- Edge Function deploy, secret yapılandırması, health-check ve backup/restore doğrulaması yapılmadı.
+- Şifre sıfırlama, oturum iptali ve diğer işletim adımları pilot öncesi manuel kapılardan geçirilmelidir.

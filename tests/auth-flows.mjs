@@ -172,11 +172,11 @@ try {
   const chks = sp.locator('[data-ek-chk]');
   const nChk = await chks.count();
   await chks.first().check();
-  await sp.waitForFunction(() => document.querySelector('#saveMsg')?.textContent.includes('Kaydedildi'));
+  await sp.waitForSelector('#saveMsg:has-text("Kaydedildi")');
   check(mock.db.submissions[0]?.status === 'devam' && mock.db.submissions[0].checklist.length === 1, 'ilk işaretlemede teslim “devam ediyor” olarak kaydedildi');
   for (let i = 1; i < nChk; i++) await chks.nth(i).check();
   await sp.fill('#refl', 'Önce birimleri eşitlemem gerektiğini öğrendim.');
-  await sp.waitForFunction(() => !document.querySelector('[data-done]').disabled);
+  await sp.locator('[data-done]:enabled').waitFor();
   await sp.click('[data-done]');
   await sp.waitForSelector('.celebrate');
   check(mock.db.submissions[0].status === 'tamamlandi' && !!mock.db.submissions[0].completed_at, 'etkinlik tamamlandı olarak kaydedildi');

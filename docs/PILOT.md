@@ -1,61 +1,81 @@
 # NavigAItor pilot kılavuzu
 
-Bu kılavuz, uygulamayı bir okulda pilot olarak kullanmaya başlamak için gereken adımları anlatır.
+Bu kılavuz bir okul ve 2–4 şubeyle sınırlı, uzman gözetimli pilot içindir. Bu dalda staging projesi oluşturulmadı; kaynak koddaki hedefler canlı ortam kanıtı değildir. Hiçbir production migration, kullanıcı verisi değişikliği veya canlı yayın bu çalışmada yapılmadı.
 
-## Adresler
+## Uygulama yolları
 
-| Kim | Adres | Ne yapar |
+| Kullanıcı | Adres | Veri kaynağı |
 |---|---|---|
-| Herkes | `/` | Tanıtım sayfası |
-| Herkes | `/giris` | Giriş ve kayıt (öğretmen, öğrenci, veli) |
-| Öğretmen ve okul yöneticisi | `/yonetim` | Şubeler, öğrenciler, PIN kartları, veli davetleri, etkinlik atama ve takip, Claude ile etkinlik üretimi |
-| Öğrenci | `/ogrenci` | Navi tanışma formu, görevler, etkinlik sayfası |
-| Veli | `/veli` | Çocuğun etkinlikleri, çalıştığı beceriler, öğretmen notları |
-| Tanıtım | `/demo` | Kurgusal verilerle eski demo panelleri (gerçek veriye dokunmaz) |
+| Herkes | `/` ve `/giris` | Tanıtım ve gerçek Auth giriş/kayıt akışları |
+| Yönetici/öğretmen | `/yonetim` | `public/app/*.js`; Supabase Auth/RLS/RPC |
+| Öğrenci | `/ogrenci` | `public/app/*.js`; kendi oturumu ve atanmış etkinlikleri |
+| Veli | `/veli` | `public/app/*.js`; bağlı çocuklara ilişkin Supabase verisi |
+| Tanıtım | `/demo` | Eski, kurgusal localStorage demosu; gerçek hesap/RLS kanıtı değildir |
 
-## Kurulum sırası (okul yöneticisi)
+`/demo` ile gerçek panelleri birbirine karıştırmayın. CI'daki auth akışları Supabase'i taklit eder; gerçek RLS veya Edge Function kanıtı değildir. Kaynak düzeyi rol/okul/şube matrisi [ACCESS-MATRIX.md](ACCESS-MATRIX.md)'de bulunur.
 
-1. `/giris` → Öğretmen → "Hesap oluştur". Okul adını yazın; okulu açan kişi **okul yöneticisi** olur.
-2. **Şubelerim** → "+ Yeni şube". Sistem 6 karakterlik **sınıf kodu** üretir.
-3. **Öğrenciler** → "+ Öğrenci ekle". Excel'den No, Ad ve Soyad sütunlarını kopyalayıp yapıştırın. Her öğrenci için 4 haneli PIN üretilir. **PIN kartlarını hemen yazdırın**, çünkü PIN'ler saklanmaz.
-4. Her öğrenci için "Davet kodu üret" deyin ve kodu veliye iletin. Kod tek kullanımlıktır ve 30 gün geçerlidir.
-5. **Okul ve öğretmenler** → "Davet kodu üret". Kod **tek kullanımlıktır** ve 7 gün geçerlidir. Her öğretmen için yeni kod üretin; yeni kod, kullanılmamış eski kodu geçersiz kılar. Öğretmenleri ardından şubelere ve derslere atayın.
-6. Güvenlik için **ikinci bir yönetici** atayın (Okul ve öğretmenler → "Yönetici yap"). Böylece bir yönetici şifresini unutursa diğeri sıfırlayabilir.
+## Pilot öncesi zorunlu engeller
 
-## Günlük kullanım
+1. **E-posta doğrulaması:** `kayit-ogretmen` ve `kayit-veli` şu an `email_confirm: true` ile kullanıcı açıyor. Bu, kullanıcının e-posta adresini gerçekten doğruladığını kanıtlamaz. SMTP/Auth doğrulama akışı staging'de çalışır ve ayrı cihazdan test edilir olana kadar gerçek öğretmen/veli kaydı bu yolla açılmamalı.
+2. **Staging bulunmuyor:** Hesap/proje, migration uygulama durumu ve Edge Function dağıtımı bu checkout'ta doğrulanmadı. Production kullanılamaz; migration `0008` ve `0009` yalnızca izole staging'de gözden geçirilip test edilmelidir.
+3. **Erişim politikası migration'ı:** `20261031000009_profile_isolation.sql` öğretmenlerin okul personel profillerini ve diğer öğretmenlerin şube atamalarını listelemesini kapatır. Migration uygulanıp admin/teacher pozitif-negatif testleri geçene kadar bu erişim düzeltmesi etkin sayılmaz.
+4. **Rate-limit güvenilir adresi:** İstek kotası atomik hale getirildi; ancak Edge Function'lar `x-forwarded-for` kullanıyor. Supabase gateway'in bu başlığı güvenilir biçimde ürettiği/taklidinin mümkün olmadığı doğrulanmadı. Kaynak doğrulanana kadar brute-force koruması tam kanıtlanmış değildir.
+5. **Roster veri minimizasyonu:** Öğrenci girişindeki sınıf kodu uç noktası, kodu bilenlere isim etiketi ve öğrenci UUID'si verir. UUID'yi tarayıcıya taşımayan kısa ömürlü bilet veya eşdeğer çözüm staging'de uygulanıp test edilmelidir.
 
-- **Öğretmen:**
-  - Etkinlikler → "Kütüphaneden ata" ya da "✨ Claude ile üret". Taslağı gözden geçirip "Şubeye ata" deyin.
-  - Atama kartında kimin tamamladığını görür, öğrencinin notunu okur, kısa geri bildirim yazarsınız.
-- **Öğrenci:**
-  - `/giris` → Öğrenci → sınıf kodu → adını seç → PIN.
-  - İlk girişte Navi tanışma formu açılır; sonra doldurulabilir.
-  - Etkinlikte kontrol listesindeki maddelerin hepsini işaretleyince "Etkinliği tamamladım" açılır.
-- **Veli:** davet koduyla kaydolur ve açık rıza verir. Çocuğunun ilerlemesini görür. Başka çocuklarını "+ Çocuk ekle" ile bağlar.
+Bu kapılar kapanmadan “pilot için teknik olarak hazır” denmemelidir.
 
-## Sık karşılaşılan durumlar
+## Staging kurulumu ve değişiklik penceresi
 
-| Durum | Çözüm |
-|---|---|
-| Öğrenci PIN'ini unuttu | Öğrenciler → "Yeni PIN" (eski PIN geçersiz olur) |
-| PIN kartları kayboldu | Öğrenciler → "Tüm PIN'leri yenile" → yazdır |
-| Öğrenci şube değiştirdi | Öğrencinin adına tıklayın → "Şube değiştir". PIN, veli bağlantısı ve geçmiş korunur |
-| Öğretmen veya veli şifresini unuttu | Okul yöneticisi: Okul ve öğretmenler → "Şifre sıfırla". Üretilen geçici şifre kişiye iletilir; kişi giriş yapıp "Şifre" düğmesinden değiştirir |
-| Öğrenci okuldan ayrıldı | Geçici olarak: "Pasif yap". KVKK silme talebinde: yönetici → "Sil" (öğrencinin adı yazılarak onaylanır; geri alınamaz) |
-| Veli davet kodu kayboldu | Aynı öğrenci için yeni davet kodu üretin |
-| Yanlış PIN denemeleri | Her 5 yanlış denemede giriş kilitlenir: önce 15 dakika, sonra 30 dakika, 1 saat… en çok 4 saat. "Yeni PIN" kilidi hemen açar |
-| Tek yönetici şifresini unuttu ve başka yönetici yok | Teknik ekip Supabase panelinden (Authentication → Users) geçici şifre verir |
+- [ ] Ayrı staging Supabase projesi açıldı; proje ref'i, bölgesi ve hedef ortam yetkililerce kaydedildi. Bu görev staging oluşturmadı.
+- [ ] Staging frontend yapılandırması (`public/config.js`/build hedefi) production URL ve anahtarından ayrı doğrulandı; kaynak kodda servis sırları yok.
+- [ ] Migration'lar staging'de sıralı olarak uygulandı: `0001`–`0007`, ardından `20261031000008_atomic_limits.sql` ve `20261031000009_profile_isolation.sql`. Uygulanan sürümler migration geçmişinden doğrulandı.
+- [ ] Staging Auth e-posta doğrulaması, redirect URL ve SMTP teslimatı test edildi; kullanıcı hesabı doğrulama öncesi yetkili sayılmıyor.
+- [ ] Edge Function'lar staging'e deploy edildi; `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT` staging ortam değişkenleri/secret'ları olarak tanımlandı. Değerleri depoya veya loga yazılmadı.
+- [ ] Staging smoke hesapları üretim/pilot hesabından ayrı tutuldu ve temizleme planı kaydedildi.
+- [ ] Health-check `/`, `/giris`, `/yonetim`, `/ogrenci`, `/veli`; Auth, temel RPC, her Edge Function ve hata loglarıyla tamamlandı.
 
-## Bilinen sınırlar (pilot)
+Production hedefini seçen bir komut bu runbook'ta yoktur. Production migration/deploy ayrı yetkili incelemesi, yedek doğrulaması ve değişiklik penceresi onayı gerektirir.
 
-- E-posta ile şifre sıfırlama kapalıdır, çünkü özel SMTP kurulmadı. Şifreler yönetici üzerinden sıfırlanır.
-- Claude ile üretim öğretmen başına günde 40 taslakla (`AI_DAILY_LIMIT`), sistem genelinde günde 300 taslakla (`AI_GLOBAL_DAILY_LIMIT`) sınırlıdır. Bir üretim 30–60 saniye sürer. Ayrıca Anthropic konsolunda aylık harcama sınırı tanımlanmalıdır.
-- Uygulama çevrimdışı açılır, ancak kayıt ve teslim için internet gerekir.
+## Staging kabul testleri
 
-## Teknik işletim
+Staging'de gerçek iki okul ve ayrı tarayıcı/oturumlarla her adım için başarı ve yetkisiz erişim reddi kanıtı saklanmalıdır:
 
-- **Yayın:** `main` dalına her gönderimde Vercel otomatik yayınlar. Hizmet çalışanı sürümü her derlemede değişir, böylece eski kod önbellekte kalmaz.
-- **Veritabanı:** Supabase `navigaitor`, AB-Frankfurt bölgesinde. Göçler `supabase/migrations`, sunucu fonksiyonları `supabase/functions` altındadır.
-- **Gizli anahtarlar:** `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT` ve `AI_GLOBAL_DAILY_LIMIT` Supabase → Edge Functions → Secrets bölümündedir. Depoda gizli anahtar yoktur.
-- **İşlem kaydı:** yönetici şifre sıfırlama ve öğrenci silme işlemleri `admin_log` tablosuna kişisel veri olmadan yazılır.
-- **Testler:** `npm test` (derleme, duman testi, uçtan uca akış testi, güvenlik testi).
+- Yönetici şube açar, öğretmeni davet edip atar; öğretmen öğrencileri ekler.
+- Öğrenci başka cihaz/tarayıcıdan doğru kendi hesabıyla açılır; yalnızca kendine atanmış etkinlikleri görür.
+- Öğrenci etkinliği kaydeder/tamamlar; öğretmen aynı gerçek veritabanı durumunu görür.
+- Veli tek kullanımlık davetle bağlanır; kendi çocuğunu görür, başka çocuğun rapor/teslimine erişemez.
+- Öğretmen başka okulun profilini, atamasını, davetini ve öğrencisini okuyamaz; öğrenci başka öğrenci kaydını okuyamaz.
+- Kullanılmış/sona ermiş davet, yanlış PIN, kilit, tekrarlı istek, `srv_rate_limit` hata durumu ve paralel kota isteği güvenli biçimde sınanır.
+- Çıkıştan sonra eski kullanıcının yerel oturumu ve hassas önbellek verisi görünmez; rol değişimi yeni profil/RLS ile doğrulanır.
+- AI geçersiz rol/girdi, eksik anahtar, kotanın dolması, kota RPC hatası, sağlayıcı hatası/timeout ve bozuk/şema dışı çıktıda güvenli hata verir.
+
+Bu depo testleri gerçek Supabase/RLS veya Anthropic üretimini kanıtlamaz; staging kanıtının yerine geçmez.
+
+## Temiz kurulum ve otomatik test
+
+```bash
+nvm use                         # .nvmrc: Node 22
+npm ci
+npx playwright install --with-deps chromium
+npm test
+```
+
+`npm test` build, JavaScript static syntax kontrolleri, `/demo` localStorage smoke, gerçek sayfa yollarında mock Supabase auth akışları ve yerel XSS testini çalıştırır. Mock senaryolarını canlı güvenlik kanıtı diye raporlamayın. CI da Node 22 üzerinde aynı local/mock testleri çalıştırır; migration SQL veya gerçek Edge Function entegrasyon testi çalıştırmaz.
+
+## Dağıtım, geri alma ve işletim
+
+- Frontend ve Supabase migration/Edge Function sürümleri farklı release yüzeyleridir. Vercel deploy bağlantısı bu checkout'ta doğrulanmadı; CI otomatik production yayın yapmaz.
+- Önce migration dosyaları incelenmeli ve staging'e sıralı uygulanmalı; migration planı/DB snapshot'ı ve doğrulama sorguları kaydedilmeden production'a geçilmemelidir.
+- Her Edge Function ayrı deploy edilir; gerekli secret/model değişkenleri ilgili Supabase **staging** projesinde tanımlanır. Secret değişkenlerini build çıktısına koymayın.
+- `0008` rate-limit/kota RPC'lerini değiştirir; `0009` RLS politikalarını daraltır. Bunlar source tree'de bulunuyor, uygulanmış sayılmaz.
+- Hata halinde frontend sürümü geri alınabilir; şema değişikliği geri alınamıyorsa destructive rollback yerine uyumlu sürüm veya forward-fix hazırlanır. Migration'ı production'da otomatik tersine çevirme.
+- [ ] Staging migration/deploy ve geri alma/forward-fix provası yapıldı.
+- [ ] Yedekleme sıklığı/saklama süresi doğrulandı; izole ortamda backup restore provası yapıldı.
+- [ ] Hata izleme, servis sorumlusu, günlük sağlık kontrolü ve pilot durdurma kişisi belirlendi.
+
+## Kullanım sınırları
+
+- Uygulama kabuğu ve statik dosyalar service worker ile çevrimdışı açılabilir; Supabase veri okuma/yazma çevrimdışı çalışmaz. Taslak/teslimler için çevrimdışı kuyruk ve cihazlar arası çatışma çözümü yoktur. Pilot işlemleri çevrimiçi yapın; hata mesajı görünürken sayfadan ayrılmadan yeniden deneyin. Yenileme/sekme kapatma öncesi sunucu kaydını doğrulayın.
+- AI girişinde e-posta, telefon ve TC kimlik benzeri örüntüler reddedilir ve ham istem/yanıt veritabanına kaydedilmez; ad, adres ve dolaylı tanımlayıcılar kusursuz yakalanamaz. Serbest metne gerçek öğrenci/veli bilgisi yazılmamalı. Üretilen içerik öğretmen incelemesinden geçmeden atanmaz; pedagojik doğruluk otomatik garanti değildir.
+- Gerçek veri tabanına bağlı olmayan veya demo kapsamındaki mesajlaşma/rapor paylaşımı gibi eylemler gönderilmiş/kaydedilmiş olarak gösterilmemelidir. Bu kapsamın kullanıcıya dönük etiketleri staging'de ayrıca gözden geçirilmelidir.
+- Backup/restore, canlı RLS/Edge davranışı, migration uygulama durumu ve production deploy bu çalışmada doğrulanmadı.

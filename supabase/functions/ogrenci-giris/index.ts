@@ -21,9 +21,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
 const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
-const allowed = async (bucket: string, max: number, windowSec: number) => {
+const allowed = async (bucket: string, max: number, windowSec: number): Promise<boolean | null> => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
+  return error ? null : data === true;
 };
 const studentEmail = (id: string) => `ogrenci-${id}@ogrenci.navigaitor.app`;
 
@@ -39,7 +39,10 @@ Deno.serve(async (req) => {
     return fail('Sınıf kodu, isim ve 4 haneli şifre gerekli.');
   }
   // Okul ağında tüm öğrenciler aynı IP'yi paylaşır: sınır sınıf kodu başına ve IP başına geniş tutulur; asıl koruma öğrenci başına PIN kilididir.
-  if (!(await allowed('ogrenci-giris:' + code, 400, 600)) || !(await allowed('ogrenci-giris-ip:' + clientIp(req), 1500, 600))) {
+  const codeAllowed = await allowed('ogrenci-giris:' + code, 400, 600);
+  const ipAllowed = codeAllowed === null ? null : await allowed('ogrenci-giris-ip:' + clientIp(req), 1500, 600);
+  if (codeAllowed === null || ipAllowed === null) return fail('Şu an giriş yapılamıyor.', 503);
+  if (!codeAllowed || !ipAllowed) {
     return fail('Çok fazla deneme. Birkaç dakika sonra yeniden deneyin.', 429);
   }
 

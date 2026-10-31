@@ -21,9 +21,9 @@ const json = (body: unknown, status = 200) =>
 const fail = (error: string, status = 400) => json({ error }, status);
 const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'bilinmiyor';
 const userMsg = (m: string) => (/Davet|davet|Okul adı|eşleşmiyor/.test(m) ? m.split('\n')[0].slice(0, 160) : '');
-const allowed = async (bucket: string, max: number, windowSec: number) => {
+const allowed = async (bucket: string, max: number, windowSec: number): Promise<boolean | null> => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
+  return error ? null : data === true;
 };
 
 Deno.serve(async (req) => {
@@ -36,7 +36,9 @@ Deno.serve(async (req) => {
   const relation = String(body.relation ?? '').trim().slice(0, 30);
   if (!/^[A-Z0-9]{8}$/.test(inviteCode)) return fail('Davet kodu 8 karakter olmalı.');
   if (body.consent !== true) return fail('Devam etmek için açık rıza metnini onaylamanız gerekiyor.');
-  if (!(await allowed('kayit-veli:' + clientIp(req), 120, 3600))) {
+  const rateAllowed = await allowed('kayit-veli:' + clientIp(req), 120, 3600);
+  if (rateAllowed === null) return fail('Şu an kayıt yapılamıyor.', 503);
+  if (!rateAllowed) {
     return fail('Çok fazla deneme. Bir saat sonra yeniden deneyin.', 429);
   }
 
