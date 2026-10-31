@@ -24,6 +24,18 @@ browser.newContext = ((orig) => async (...a) => { const c = await orig.apply(bro
 const text = (p, sel = 'body') => p.locator(sel).innerText();
 
 try {
+  // ---------------------------------------------------------------- 0. Ortak şifre sıfırlama akışı
+  const reset = await newCtx();
+  const rp = await reset.newPage();
+  await rp.goto(BASE + '/giris#ogretmen');
+  await rp.click('button[data-mode="forgot"]');
+  await rp.fill('#resetEmail', 'selin@okul.test');
+  await rp.click('#forgot button.pri');
+  await rp.waitForSelector('.msg.ok');
+  check((await text(rp, '.msg.ok')).includes('Şifre yenileme e-postası'), 'giriş sayfası şifre yenileme e-postası istedi');
+  check(mock.calls.some((c) => c.includes('/auth/v1/recover')), 'Supabase Auth recovery endpointi çağrıldı');
+  await reset.close();
+
   // ---------------------------------------------------------------- 1. Öğretmen kaydı → yönetim
   const t = await newCtx();
   const page = await t.newPage();

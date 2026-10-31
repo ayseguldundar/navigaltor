@@ -3,4 +3,5 @@
 window.NAVI_CONFIG = {
   supabaseUrl: 'https://trjqnzsqxlbgwdlasopr.supabase.co',
   publishableKey: 'sb_publishable__hNUgzyiZsyuwWk4265AZg_q0Qwg7ae',
+  appUrl: 'https://navigaltor.vercel.app',
 };
