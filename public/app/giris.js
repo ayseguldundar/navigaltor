@@ -188,7 +188,7 @@ async function onForgotPassword(e) {
   e.preventDefault();
   const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
   await run(async () => {
-    const redirectTo = `${location.origin}/sifre-yenileme`;
+    const redirectTo = `${window.NAVI_CONFIG.appUrl}/sifre-yenileme`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw new Error('Şifre yenileme e-postası gönderilemedi. E-posta adresini kontrol edip tekrar deneyin.');
     S.resetSent = true;
