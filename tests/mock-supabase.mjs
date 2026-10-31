@@ -190,6 +190,7 @@ export function createMock() {
       const u = db.users.find((x) => 'r-' + x.id === b.refresh_token);
       return u ? send(200, session(u)) : send(400, { msg: 'Invalid Refresh Token' });
     }
+    if (p === '/auth/v1/recover' && req.method() === 'POST') return send(200, {});
     if (p === '/auth/v1/user') {
       const u = userByToken(hdr.authorization);
       if (!u) return send(401, { msg: 'invalid JWT' });

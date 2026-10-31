@@ -3,7 +3,7 @@ import { supabase, callFn, currentProfile, homeFor, ROLE_TR, signOut, esc } from
 import { KVKK } from './kvkk.js';
 
 const app = document.getElementById('app');
-const S = { role: 'ogretmen', mode: 'login', busy: false, msg: null, stu: { step: 'code', code: '', roster: null, student: null, pin: '' } };
+const S = { role: 'ogretmen', mode: 'login', busy: false, msg: null, resetSent: false, stu: { step: 'code', code: '', roster: null, student: null, pin: '' } };
 
 
 
@@ -16,6 +16,15 @@ addEventListener('hashchange', () => { fromHash(); S.msg = null; draw(); });
 
 const msg = () => (S.msg ? `<div class="msg ${S.msg.k}" role="alert">${esc(S.msg.t)}</div>` : '');
 const spin = (label) => (S.busy ? '<span class="spinner"></span> Lütfen bekleyin…' : label);
+
+function passwordResetView() {
+  return `<h1>Şifremi unuttum</h1><p class="muted">Hesabınızın e-posta adresini yazın. Şifrenizi yenileyebileceğiniz güvenli bağlantıyı e-posta ile göndereceğiz.</p>${msg()}
+    <form id="forgot"><div class="fld"><label for="resetEmail">E-posta</label><input class="in" id="resetEmail" name="email" type="email" autocomplete="email" required></div>
+    <button class="btn pri lg" style="width:100%" ${S.busy || S.resetSent ? 'disabled' : ''}>${spin('Şifre yenileme bağlantısı gönder')}</button></form>
+    <p class="small" style="margin-top:12px"><button class="toggle" data-mode="login">Giriş ekranına dön</button></p>`;
+}
+
+const forgotLink = () => `<p class="small" style="margin-top:10px"><button class="toggle" data-mode="forgot">Şifremi unuttum</button></p>`;
 
 function roleTabs() {
   const r = [['ogretmen', '👩‍🏫', 'Öğretmen'], ['ogrenci', '🎒', 'Öğrenci'], ['veli', '👨‍👩‍👧', 'Veli']];
@@ -41,7 +50,7 @@ function teacherView() {
     <form id="f"><div class="fld"><label for="em">E-posta</label><input class="in" id="em" name="email" type="email" autocomplete="email" required></div>
     <div class="fld"><label for="pw">Şifre</label><input class="in" id="pw" name="password" type="password" autocomplete="current-password" required></div>
     <button class="btn pri lg" style="width:100%" ${S.busy ? 'disabled' : ''}>${spin('Giriş yap')}</button></form>
-    <p class="small" style="margin-top:12px">Hesabınız yok mu? <button class="toggle" data-mode="signup">Öğretmen hesabı oluşturun</button></p>`;
+    ${forgotLink()}<p class="small" style="margin-top:4px">Hesabınız yok mu? <button class="toggle" data-mode="signup">Öğretmen hesabı oluşturun</button></p>`;
 }
 
 function studentView() {
@@ -63,7 +72,7 @@ function studentView() {
   }
   return `<h1>Öğrenci girişi</h1><p class="muted">Öğretmeninin verdiği 6 harfli sınıf kodunu yaz.</p>${msg()}
     <form id="f"><div class="fld"><label for="cc" class="sr">Sınıf kodu</label><input class="in kod" id="cc" name="code" maxlength="6" autocomplete="off" autocapitalize="characters" value="${esc(st.code)}" required></div>
-    <button class="btn pri lg" style="width:100%" ${S.busy ? 'disabled' : ''}>${spin('Devam')}</button></form>`;
+    <button class="btn pri lg" style="width:100%" ${S.busy ? 'disabled' : ''}>${spin('Devam')}</button></form>${forgotLink()}`;
 }
 
 function parentView() {
@@ -83,7 +92,7 @@ function parentView() {
     <form id="f"><div class="fld"><label for="em">E-posta</label><input class="in" id="em" name="email" type="email" autocomplete="email" required></div>
     <div class="fld"><label for="pw">Şifre</label><input class="in" id="pw" name="password" type="password" autocomplete="current-password" required></div>
     <button class="btn pri lg" style="width:100%" ${S.busy ? 'disabled' : ''}>${spin('Giriş yap')}</button></form>
-    <p class="small" style="margin-top:12px">İlk kez mi geliyorsunuz? <button class="toggle" data-mode="signup">Davet koduyla hesap oluşturun</button></p>`;
+    ${forgotLink()}<p class="small" style="margin-top:4px">İlk kez mi geliyorsunuz? <button class="toggle" data-mode="signup">Davet koduyla hesap oluşturun</button></p>`;
 }
 
 async function signedInView(p) {
@@ -93,13 +102,14 @@ async function signedInView(p) {
 }
 
 function draw() {
-  app.innerHTML = roleTabs() + (S.role === 'ogretmen' ? teacherView() : S.role === 'ogrenci' ? studentView() : parentView());
+  app.innerHTML = roleTabs() + (S.mode === 'forgot' ? passwordResetView() : S.role === 'ogretmen' ? teacherView() : S.role === 'ogrenci' ? studentView() : parentView());
   const kind = app.querySelectorAll('input[name=kind]');
   kind.forEach((r) => r.addEventListener('change', () => {
     const inv = app.querySelector('input[name=kind]:checked').value === 'invite';
     app.querySelector('#fSchool').hidden = inv; app.querySelector('#fInvite').hidden = !inv;
   }));
   app.querySelector('#f')?.addEventListener('submit', onSubmit);
+  app.querySelector('#forgot')?.addEventListener('submit', onForgotPassword);
   const first = app.querySelector('#f input');
   if (first && !S.msg) first.focus({ preventScroll: true });
 }
@@ -107,8 +117,8 @@ function draw() {
 app.addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
-  if (t.dataset.role) { e.preventDefault(); history.replaceState(null, '', '#' + t.dataset.role); S.role = t.dataset.role; S.mode = 'login'; S.msg = null; draw(); }
-  else if (t.dataset.mode) { e.preventDefault(); S.mode = t.dataset.mode; S.msg = null; draw(); }
+  if (t.dataset.role) { e.preventDefault(); history.replaceState(null, '', '#' + t.dataset.role); S.role = t.dataset.role; S.mode = 'login'; S.msg = null; S.resetSent = false; draw(); }
+  else if (t.dataset.mode) { e.preventDefault(); S.mode = t.dataset.mode; S.msg = null; S.resetSent = false; draw(); }
   else if (t.dataset.stu) { S.stu.step = t.dataset.stu === 'back' ? 'code' : t.dataset.stu; S.stu.pin = ''; S.msg = null; draw(); }
   else if (t.dataset.pick) {
     S.stu.student = S.stu.roster.students.find((s) => s.id === t.dataset.pick); S.stu.step = 'pin'; S.stu.pin = ''; S.msg = null; draw();
@@ -171,6 +181,18 @@ async function onSubmit(e) {
     const { error } = await supabase.auth.signInWithPassword({ email: String(f.email).trim(), password: f.password });
     if (error) throw new Error(/invalid/i.test(error.message) ? 'E-posta veya şifre hatalı.' : 'Giriş yapılamadı. Biraz sonra yeniden deneyin.');
     await goHome();
+  });
+}
+
+async function onForgotPassword(e) {
+  e.preventDefault();
+  const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
+  await run(async () => {
+    const redirectTo = `${location.origin}/sifre-yenileme`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw new Error('Şifre yenileme e-postası gönderilemedi. E-posta adresini kontrol edip tekrar deneyin.');
+    S.resetSent = true;
+    S.msg = { k: 'ok', t: 'Şifre yenileme e-postası gönderildi. E-posta adresinizi kontrol edin.' };
   });
 }
 

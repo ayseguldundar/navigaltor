@@ -53,7 +53,7 @@ Bu kılavuz, uygulamayı bir okulda gözetimli pilot olarak kullanmaya başlamak
 
 - Çevrimdışı açılış desteklenir; kayıt ve teslim internet ister.
 - AI kotası öğretmen başına ve sistem geneline uygulanır; Anthropic tarafında ayrıca harcama tavanı koyun.
-- Self-service e-posta şifre sıfırlama için SMTP kurulumu gerekir.
+- Self-service e-posta şifre sıfırlama `/giris` ekranındaki **Şifremi unuttum** butonuyla başlar. Supabase Auth’ta Resend SMTP göndericisini yapılandırın; `https://<domain>/sifre-yenileme` adresini Auth URL allow-list’ine ekleyin. Recovery mailindeki bağlantı yeni parolayı kaydeder ve kullanıcıyı tekrar girişe yönlendirir.
 - Mock testler gerçek Supabase RLS kanıtı değildir; staging entegrasyon çıktısını ayrıca saklayın.
 
 ## Rollback
