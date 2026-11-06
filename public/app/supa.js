@@ -47,7 +47,7 @@ export function showOffline(el, msg = 'Sunucuya ulaşılamadı. İnternet bağla
 export const homeFor = (role) => (role === 'student' ? '/ogrenci' : role === 'parent' ? '/veli' : '/yonetim');
 export const ROLE_TR = { admin: 'Okul yöneticisi', teacher: 'Öğretmen', student: 'Öğrenci', parent: 'Veli' };
 
-export async function signOut(to = '/giris') {
+export async function signOut(to = '/giris-auth') {
   await supabase.auth.signOut();
   location.href = to;
 }

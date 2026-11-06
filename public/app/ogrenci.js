@@ -10,7 +10,7 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('tr-TR', { day: 'nume
 let me = null;
 try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || me.role !== 'student') {
-  location.replace(me ? homeFor(me.role) : '/giris#ogrenci');
+  location.replace(me ? homeFor(me.role) : '/giris-auth#ogrenci');
   await new Promise(() => {});
 }
 S.me = me;
@@ -40,7 +40,7 @@ const nick = () => {
 function header() {
   document.getElementById('me').innerHTML = `<span class="av">${window.stuEmoji(42)}</span><span class="small"><b>${esc(nick())}</b><br><span class="muted">${esc(S.section ? S.section.name : '')}</span></span>
     <button class="btn sm" data-act-ob="edit" title="Navi tanışma formu" aria-label="Navi tanışma formu">👋<span class="lbl"> Tanışma formu</span></button><button class="btn sm" id="out">Çıkış</button>`;
-  document.getElementById('out').onclick = () => signOut('/giris#ogrenci');
+  document.getElementById('out').onclick = () => signOut('/giris-auth#ogrenci');
 }
 
 // ---------------------------------------------------------------- görevlerim
@@ -202,5 +202,5 @@ try {
   }
 } catch (err) {
   app.innerHTML = `<div class="card"><div class="msg err">${esc(err.message)}</div><div class="row"><button class="btn pri" onclick="location.reload()">Yeniden dene</button><button class="btn" id="out2">Çıkış yap</button></div></div>`;
-  document.getElementById('out2').onclick = () => signOut('/giris#ogrenci');
+  document.getElementById('out2').onclick = () => signOut('/giris-auth#ogrenci');
 }

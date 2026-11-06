@@ -12,7 +12,7 @@ const S = { tab: 'subeler', ctx: null, me: null, sec: null, students: [], guardi
 let me = null;
 try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || !['admin', 'teacher'].includes(me.role)) {
-  location.replace(me ? (me.role === 'student' ? '/ogrenci' : '/veli') : '/giris#ogretmen');
+  location.replace(me ? (me.role === 'student' ? '/ogrenci' : '/veli') : '/giris-auth#ogretmen');
   await new Promise(() => {}); // yönlendirme sürerken başka bir şey yapma
 }
 S.me = me;
@@ -20,7 +20,7 @@ const isAdmin = me.role === 'admin';
 document.getElementById('who').innerHTML = `<span class="av">${esc(me.full_name.split(' ').map((p) => p[0]).join('').slice(0, 2))}</span>
   <span><b>${esc(me.full_name)}</b><small>${ROLE_TR[me.role]}</small></span>
   <a class="btn sm" href="/demo/ogretmen" title="Kurgusal verilerle tanıtım paneli">Demo</a><button class="btn sm" id="pwd">Şifre</button><button class="btn sm" id="out">Çıkış</button>`;
-document.getElementById('out').onclick = () => signOut('/giris');
+document.getElementById('out').onclick = () => signOut('/giris-auth');
 document.getElementById('pwd').onclick = () => changePasswordDialog(dlg, dlgBody);
 
 const msg = () => (S.msg ? `<div class="msg ${S.msg.k}" role="status">${esc(S.msg.t)}</div>` : '');
@@ -265,7 +265,7 @@ function printCards(list, noPins) {
   const sec = S.ctx.sections.find((s) => s.id === S.sec);
   const cards = `<div class="pin-cards">${list.map((s) => `<div class="pin-card"><div class="small muted">NavigAItor · ${esc(sec.name)}</div>
     <b>${esc(s.first_name)} ${esc(s.last_name)}</b>
-    <div class="small" style="margin-top:6px">1. ${esc(location.host)}/giris adresine gir<br>2. Sınıf kodu: <span class="code">${esc(sec.class_code)}</span><br>3. Adını seç, şifreni gir</div>
+    <div class="small" style="margin-top:6px">1. ${esc(location.host)}/giris-auth adresine gir<br>2. Sınıf kodu: <span class="code">${esc(sec.class_code)}</span><br>3. Adını seç, şifreni gir</div>
     <div class="small muted" style="margin-top:6px">Şifre</div><div class="code pin">${s.pin ? esc(s.pin) : '_ _ _ _'}</div></div>`).join('')}</div>`;
   openDlg(`<h2>${noPins ? 'Giriş kartları' : 'Öğrenci şifreleri hazır'}</h2>
     <p class="muted small">${noPins ? "PIN'ler saklanmadığı için kartlarda boş bırakıldı; öğrenciye ayrıca iletin ya da “Yeni PIN” üretin." : "Bu şifreler yalnızca şimdi görünür. Yazdırın veya öğrencilere iletin; pencere kapandıktan sonra yeniden gösterilemez."}</p>

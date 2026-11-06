@@ -13,11 +13,11 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('tr-TR', { day: 'nume
 let me = null;
 try { me = await currentProfile(); } catch (err) { showOffline(document.getElementById('app'), err.message); await new Promise(() => {}); }
 if (!me || me.role !== 'parent') {
-  location.replace(me ? homeFor(me.role) : '/giris#veli');
+  location.replace(me ? homeFor(me.role) : '/giris-auth#veli');
   await new Promise(() => {});
 }
 document.getElementById('who').innerHTML = `<span class="small"><b>${esc(me.full_name)}</b></span><button class="btn sm" data-add>+ Çocuk ekle</button><button class="btn sm" data-pwd>Şifre</button><button class="btn sm" id="out">Çıkış</button>`;
-document.getElementById('out').onclick = () => signOut('/giris#veli');
+document.getElementById('out').onclick = () => signOut('/giris-auth#veli');
 
 async function load() {
   const [k, a, s, sec] = await Promise.all([

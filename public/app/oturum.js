@@ -17,7 +17,7 @@ chip.innerHTML = profile
      <span class="no-t"><b>${esc(profile.full_name)}</b><small>${ROLE_TR[profile.role] || ''}</small></span>
      ${window.naviAuth.isStaff() ? '<a href="/yonetim" title="Şubeler ve öğrenciler">Yönetim</a>' : ''}
      <button type="button">Çıkış</button>`
-  : `<span class="no-t"><b>Demo modu</b><small>Kurgusal veriler</small></span><a href="/giris">Giriş yap</a>`;
+  : `<span class="no-t"><b>Demo modu</b><small>Kurgusal veriler</small></span>`;
 const st = document.createElement('style');
 st.textContent = `.navi-oturum{position:fixed;right:12px;bottom:58px;z-index:70;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 6px;border-radius:999px;background:rgba(255,253,249,.96);border:1px solid #EADFCC;box-shadow:0 10px 24px -16px rgba(60,30,10,.5);font:600 12px/1.2 Manrope,system-ui,sans-serif;color:#2B2118}
 .navi-oturum .no-av{width:28px;height:28px;border-radius:50%;background:#810000;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:800}

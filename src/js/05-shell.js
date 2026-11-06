@@ -29,7 +29,7 @@ function sidebar(){
     h+=`<button class="nv ${on?'on':''} ${open?'open':''}" data-act="nav" data-v="${n.id}" ${on?'aria-current="page"':''} ${n.subs?`aria-expanded="${!!open}"`:''} ${UI.collapsed?`data-tip="${n.l}"`:''}>${ic(n.ic,19)}<span class="lbl">${n.l}</span>${c?`<span class="cnt" aria-label="${c} ${n.cntL}">${c}</span>`:''}${n.subs?ic('cd',15,'car'):''}</button>`;
     if(n.subs)h+=`<div class="sub ${open?'open':''}"><div>${n.subs.map(([s,l])=>`<button class="${on&&UI.sub===s?'on':''}" data-go="${n.id}/${s}" tabindex="${open?0:-1}">${l}</button>`).join('')}</div></div>`;
   });
-  h+=`</nav><div class="side-ft"><span class="brand">Navig<span>AI</span>tor</span><button class="icb-s" data-act="collapse" aria-label="${UI.collapsed?'Menüyü genişlet':'Menüyü daralt'}" data-tip="${UI.collapsed?'Menüyü genişlet':'Menüyü daralt'}">${ic('panel',18)}</button></div>`;
+  h+=`</nav><div class="side-ft"><div class="brand-lockup"><img class="brand-mark" src="/icons/navigaitor-mark.png" alt=""><span class="brand">Navig<span>AI</span>tor</span></div><button class="icb-s" data-act="collapse" aria-label="${UI.collapsed?'Menüyü genişlet':'Menüyü daralt'}" data-tip="${UI.collapsed?'Menüyü genişlet':'Menüyü daralt'}">${ic('panel',18)}</button></div>`;
   return h;
 }
 function topbar(P){

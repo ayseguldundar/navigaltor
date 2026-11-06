@@ -1,100 +1,42 @@
-# NavigAItor — Demodan gerçek web uygulamasına yol haritası
+# NavigAItor — güncel teknik yol haritası
 
-_Son güncelleme: 30 Ekim 2026 — pilot sürümü canlıda; ayrıntı: [PILOT-HAZIRLIK-RAPORU.md](PILOT-HAZIRLIK-RAPORU.md), kullanım: [PILOT.md](PILOT.md)_
+_Son güncelleme: 30 Ekim 2026_
 
-## Bugün neredeyiz (Faz 0 — tamamlandı)
+## Mevcut durum
 
-| Konu | Durum |
-|---|---|
-| Kaynak kod | Depoda (`src/`), tek komutla derleniyor (`npm run build`) |
-| Yayın | Vercel, her `main` güncellemesinde otomatik yayın |
-| Kurulabilir uygulama (PWA) | Üç panel telefona/bilgisayara "uygulama" olarak eklenebiliyor, çevrimdışı açılıyor |
-| Otomatik testler | `npm test` — 21 kontrol (bağlı akışlar, 100 etkinlik, kod sızıntısı, mobil, PWA) |
-| Veri | **Yalnızca ziyaretçinin tarayıcısında** (localStorage). Sunucu, veritabanı, hesap yok |
-| Yapay zekâ | **Taklit.** "Yapay zekâdan iste" hazır şablonlardan uyarlama yapıyor; gerçek üretim yok |
-| Kullanıcılar | Kurgusal: tek öğretmen (Selin Yılmaz), tek öğrenci (Elif Yıldız), tek veli |
+NavigAItor artık yalnızca localStorage demosu değildir. Gerçek giriş, roller, okul/şube/öğrenci/veli ilişkileri, atama/teslim akışı ve AI Edge Function kodu Supabase için hazırlanmıştır. Kurgusal demo panelleri yalnızca `/demo` altında tutulur.
 
-Kısacası: arayüz ve pedagojik akış ürün kalitesinde; arkasındaki **hesaplar, veritabanı ve gerçek yapay zekâ** henüz yok. Aşağıdaki fazlar bunları ekler.
+Üretim durumu repo branch’iyle otomatik olarak eşdeğer kabul edilmemelidir. Canlı Supabase’de migration geçmişi branch’ten geridedir; gerçek pilot kararı staging doğrulaması ve kontrollü deploy sonrasında verilmelidir.
 
----
+## Tamamlanan teknik fazlar
 
-## Önerilen teknoloji yığını
-
-| Katman | Öneri | Neden |
+| Faz | Durum | Not |
 |---|---|---|
-| Barındırma | **Vercel** (mevcut) | Zaten kurulu; önizleme yayınları, otomatik HTTPS |
-| Uygulama çatısı | **Next.js (TypeScript)** — panelleri sayfa sayfa taşıyarak | Sunucu tarafı API'ler (yapay zekâ anahtarı gizli kalır), Vercel ile yerel uyum, geniş geliştirici havuzu |
-| Veritabanı + giriş | **Supabase (PostgreSQL + Auth)**, AB (Frankfurt) bölgesi | Satır düzeyi güvenlik ile "öğretmen yalnızca kendi şubesini görür" kuralı veritabanında zorlanır; hazır giriş sistemi |
-| Yapay zekâ | **Sunucu tarafı API** üzerinden büyük dil modeli (ör. Claude) | Anahtar tarayıcıya hiç inmez; her istek kayıt altına alınır |
-| Hata izleme | Sentry (ücretsiz katman) | Pilotta hataları kullanıcı bildirmeden görmek için |
+| Frontend/PWA ve demo akışı | Tamamlandı | Vercel’de yayın; PWA ve responsive smoke testleri mevcut |
+| Hesaplar ve roller | Kodda tamamlandı | Supabase Auth, rol/profil ve okul izolasyonu |
+| Atama/teslim ve veli görünümü | Kodda tamamlandı | Ayrı oturum senaryoları mock E2E ile kapsanıyor |
+| AI üretim hattı | Kodda tamamlandı | Sunucu anahtarı, öğretmen onayı, çıktı şeması ve kota |
+| Pilot hardening | Bu branch’te | CI, lockfile, fail-closed rate-limit, atomik kota migration’ı |
 
-**Taşıma stratejisi:** Mevcut arayüz yeniden yazılmaz. Önce veriler sunucuya taşınır (Faz 2), arayüz aynı kalır; sonra ekranlar ihtiyaç oldukça Next.js bileşenlerine dönüştürülür. Böylece her adımda çalışan bir ürün olur.
+## Pilota giriş sırası
 
----
+1. Staging Supabase projesini oluşturun veya seçin.
+2. Migration’ları sıralı uygulayın ve `list_migrations` çıktısını branch ile karşılaştırın.
+3. Edge Function’ları deploy edin; function version/hash ve secret varlığını doğrulayın.
+4. İki okul ile pozitif/negatif RLS testleri, yanlış PIN/davet/rate-limit testleri ve paralel AI kota testi çalıştırın.
+5. Yedekleme/geri yükleme ve rollback provasını yapın.
+6. Sadece bu kanıtlar incelendikten sonra production migration/function deploy’u için manuel onay verin.
 
-## Faz 1 — Hesaplar ve roller ✅ (29 Ekim 2026)
+## Pilot sonrası
 
-**Kararlar:** Supabase (AB-Frankfurt) · öğrenci girişi sınıf kodu + PIN · yapay zekâ Claude.
+- Gerçek Supabase RLS/Edge Function testlerini CI veya belgelenmiş staging job’a bağlamak.
+- Hata izleme, servis sağlık panosu ve hassas veri içermeyen audit metrikleri eklemek.
+- Oturum iptali, öğretmen çıkarma ve self-service şifre sıfırlamayı ürünleştirmek.
+- Frontend bundle’ını daha ileri bölmek; önce/sonra ölçümlerini CI artifact’ı olarak saklamak.
+- AI prompt/yanıt saklama süresi ve operasyonel silme politikasını teknik olarak uygulamak.
 
-**Yapılanlar:** okul/şube/öğrenci/veli tabloları ve satır düzeyi güvenlik (`supabase/migrations`), sunucu fonksiyonları (`supabase/functions`), giriş merkezi (`/giris`), yönetim konsolu (`/yonetim`), panellerde oturum köprüsü. Ayrıntı: [FAZ1.md](FAZ1.md).
+## Kaynaklar
 
-<details><summary>Başlangıç planı</summary>
-
-
-- Roller: **okul yöneticisi, öğretmen, öğrenci, veli**. Her kayıt bir okula bağlı (çok okullu yapı baştan kurulur).
-- **Öğretmen:** e-posta + şifre (veya Google ile giriş).
-- **Öğrenci:** sınıf kodu + kişisel PIN veya QR kart. 5–8. sınıf öğrencilerinden e-posta istemek hem gerçekçi değil hem KVKK açısından gereksiz veri.
-- **Veli:** öğretmenin gönderdiği davet bağlantısıyla; bağlantı veli onayı (açık rıza) adımını içerir.
-- Okul yöneticisi öğretmen ve şube ekler; öğretmen öğrenci listesini içe aktarır (Excel/CSV).
-
-</details>
-
-## Faz 2 — Verinin sunucuya taşınması (tahmini 3–4 hafta)
-
-Bugün tarayıcıdaki `DB` nesnesi şu tablolara bölünür:
-
-| Tablo | İçerik |
-|---|---|
-| `schools`, `sections`, `users`, `enrollments` | Okul, şube, kişi, şube üyeliği |
-| `curriculum_outcomes` | Resmî öğretim programı kazanımları (tymm.meb.gov.tr kaynaklı, mevcut veri) |
-| `activity_templates` | 100 kütüphane etkinliği + 21. yy beceri eşleşmeleri |
-| `assignments`, `submissions` | Atama, teslim, durum, puan |
-| `measurements`, `error_events` | Kazanım ölçümleri, kavram/işlem/strateji hataları |
-| `products` | Dijital ürünler (dosyalar Supabase Storage'da) |
-| `intake_answers` | Navi tanışma formu cevapları |
-| `reports`, `teacher_notes` | 3 aylık rapor anlık görüntüleri, öğretmen notları |
-
-Arayüzdeki "öğretmen atar → öğrenci planında görür → öğrenci tamamlar → öğretmen görür" akışı bugün tek tarayıcıda çalışıyor; bu fazdan sonra **farklı cihazlar arasında** çalışır.
-
-## Faz 3 — Gerçek yapay zekâ (tahmini 3–4 hafta)
-
-- **Altın kural:** Ders kitapları ve etkinlik kitapları soru havuzu olarak kullanılmaz. Her öğrenciye düzeyine göre **özgün ve anlık** soru/etkinlik üretilir. Kütüphanedeki 100 etkinlik üretim için **yapı şablonudur**, kopyalanacak içerik değildir.
-- Üretim sunucuda yapılır; modele öğrencinin adı veya kimliği gönderilmez, yalnızca takma kimlik + düzey + hata örüntüsü + tanışma formu tercihleri gider.
-- Öğrenciye gidecek her yapay zekâ etkinliği önce **öğretmen onayından** geçer (bugünkü "Onayla ve ata" akışı korunur).
-- Çıktılar otomatik denetlenir: kazanıma uygunluk, sınıf düzeyi, yaşa uygun dil, kazanım kodu içermeme.
-- **Maliyet:** Rakam vermek için pilot kullanım verisi gerekir (öğrenci başına günlük üretim sayısı × istek başına token). Faz 3'ün ilk haftasında 1 şubelik ölçüm yapılıp öğrenci başına aylık maliyet bu veriyle hesaplanmalı; tahmine dayalı rakam sunulmamalı.
-
-## Faz 4 — Pilot (tahmini 6–8 hafta)
-
-- 1 okul, 2–4 şube; öğretmen eğitimi ve geri bildirim döngüsü.
-- Hata izleme, günlük yedek, kullanım ölçümleri.
-- Pilot sonunda: öğrenme kazanımı ölçümü (ön-son test), öğretmen zaman tasarrufu, yapay zekâ maliyeti.
-
----
-
-## KVKK ve çocuk verisi — pilot öncesi şart
-
-- Öğrenciler reşit değil: işlenen her kişisel veri için **veli açık rızası** ve **aydınlatma metni** gerekir.
-- Veri yurt dışında (ör. AB'deki sunucu) tutulacaksa yurt dışına aktarım şartları karşılanmalı; alternatif Türkiye'de barındırma.
-- VERBİS kayıt yükümlülüğü değerlendirilmeli.
-- Yapay zekâya kimlik bilgisi gönderilmemesi (Faz 3) bu açıdan da gerekli.
-- Bu başlıklar bir KVKK danışmanıyla netleştirilmeli; bu belge hukuki görüş değildir.
-
----
-
-## Karar bekleyen konular
-
-1. **Veri nerede tutulacak?** Supabase AB bölgesi (önerilen: hızlı kurulum, yönetilen servis) ya da Türkiye'de sunucu (KVKK aktarım yükü yok, kurulum ve bakım maliyeti yüksek).
-2. **Öğrenci girişi:** sınıf kodu + PIN (önerilen) mi, okul e-postası mı?
-3. **Geliştirme iş bölümü:** Faz 1–3 hangi ekip tarafından yapılacak? Teknoloji ortağıyla aynı yığın üzerinde anlaşmak en kritik ilk adım.
-4. **Yapay zekâ sağlayıcısı ve pilot bütçe tavanı.**
+- Pilot kararları ve açık riskler: [PILOT-HAZIRLIK-RAPORU.md](PILOT-HAZIRLIK-RAPORU.md)
+- Kurulum, deploy ve rollback: [PILOT.md](PILOT.md)
+- Hesap/RLS tasarımı: [FAZ1.md](FAZ1.md)

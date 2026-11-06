@@ -19,11 +19,11 @@ const CORE = [
   '18-parent.js', '19-sims.js',
 ];
 const APP_JS = [...CORE, '22-resmi-act.js', '24-vis.js', '25-b21.js', '25-lib-data.js', '25-lib.js',
-  '26-onboard.js', '27-report.js', '28-hooks.js', '29-ai-real.js', '99-init.js'];
+  '26-onboard.js', '27-report.js', '28-hooks.js', '29-ai-real.js', '30-readiness.js', '31-personalization.js', '32-generated-video.js', '99-init.js'];
 const VELI_JS = [...CORE, '20-veli.js', '22-resmi-act.js', '26-onboard.js', '99-init-veli.js'];
 
 const PANELS = [
-  { slug: 'ogretmen', title: 'NavigAItor Öğretmen Paneli', short: 'Öğretmen', css: ['head.html', 'stu-theme.html', 'lib.html'],
+  { slug: 'ogretmen', title: 'NavigAItor Öğretmen Paneli', short: 'Öğretmen', css: ['head.html', 'stu-theme.html', 'teacher-theme.html', 'lib.html'],
     js: APP_JS, home: 'home' },
   { slug: 'ogrenci', title: 'NavigAItor Öğrenci Paneli', short: 'Öğrenci', css: ['head.html', 'stu-theme.html', 'lib.html'],
     js: APP_JS, home: 'o-home' },

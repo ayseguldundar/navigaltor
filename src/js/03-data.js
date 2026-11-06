@@ -24,15 +24,15 @@ function rKz(course,grade,code){const G=(RESMI[course]||{})[grade];if(!G)return 
 function addKzR(course,grade,code,topic,skill,win,state){const r=rKz(course,grade,code)||{unitNo:0,unitName:'—',text:null};const name=r.text||(r.kapsam?'Tema kapsamı: '+[].concat(r.kapsam).join(' '):'Çıktı metni resmi sayfadan alınamadı');addKz(course,grade,r.unitNo,r.unitName,topic,code,name,skill,win,state);const k=KZ[KZ.length-1];k.alt=r.alt||[];k.url=r.url||null;k.textMissing=!r.text}
 // MATEMATİK 7 (resmi kod: MAT.7.x.y)
 addKzR('MAT',7,'MAT.7.1.1','Tam sayılar','Problem çözme',[0,2],'ok');
-addKzR('MAT',7,'MAT.7.1.4','Tam sayılarla işlemler','Problem çözme',[1,3],'ok');
+addKzR('MAT',7,'MAT.7.1.4','Rasyonel sayılarla işlemler','Problem çözme',[1,3],'ok');
 addKzR('MAT',7,'MAT.7.1.3','Rasyonel sayıları sıralama','Eleştirel düşünme',[2,4],'ok');
-addKzR('MAT',7,'MAT.7.1.4','Kesirler','Problem çözme',[3,5],'ok');
+addKzR('MAT',7,'MAT.7.1.4','Kesirlerle toplama','Problem çözme',[3,5],'ok');
 addKzR('MAT',7,'MAT.7.2.1','Cebirsel ifadeler','Eleştirel düşünme',[4,6],'ok');
 addKzR('MAT',7,'MAT.7.2.2','Denklemler','Problem çözme',[6,7],'partial');
-addKzR('MAT',7,'MAT.7.1.6','Oran-orantı','Problem çözme',[7,7],'thin');
+addKzR('MAT',7,'MAT.7.1.5','Oran ilişkileri','Problem çözme',[7,7],'thin');
 addKzR('MAT',7,'MAT.7.1.7','Doğru orantı problemleri','Problem çözme',null,'none');
 // MATEMATİK 8
-addKzR('MAT',8,'MAT.8.1.3','Gerçek sayılar','Eleştirel düşünme',[0,2],'ok');
+addKzR('MAT',8,'MAT.8.1.3','Rasyonel ve irrasyonel sayılar','Eleştirel düşünme',[0,2],'ok');
 addKzR('MAT',8,'MAT.8.1.1','Üslü ifadeler','Eleştirel düşünme',[1,3],'ok');
 addKzR('MAT',8,'MAT.8.1.1','Bilimsel gösterim','Dijital beceri',[2,4],'ok');
 addKzR('MAT',8,'MAT.8.1.2','Kareköklü ifadeler','Eleştirel düşünme',[3,5],'ok');
@@ -41,7 +41,7 @@ addKzR('MAT',8,'MAT.8.7.1','Olasılık','Problem çözme',[6,7],'partial');
 addKzR('MAT',8,'MAT.8.3.5','Pisagor bağıntısı','Yaratıcılık',[7,7],'thin');
 addKzR('MAT',8,'MAT.8.2.2','Doğrusal fonksiyonlar','Dijital beceri',null,'none');
 // 7/A rehberlik kapsamındaki diğer dersler
-addKzR('TUR',7,'T.O.7.7','Ana fikir ve çıkarım','Eleştirel düşünme',[0,4],'ok');
+addKzR('TUR',7,'T.O.7.7','Metinden çıkarım','Eleştirel düşünme',[0,4],'ok');
 addKzR('TUR',7,'T.O.7.4','Söz varlığı','İletişim',[2,6],'ok');
 addKzR('TUR',7,'T.Y.7.3','Paragraf yazma','Yaratıcılık',[5,7],'partial');
 addKzR('FEN',7,'FB.7.1.1','Uzay teknolojileri','İletişim',[0,3],'ok');
@@ -51,6 +51,10 @@ addKzR('SOS',7,'SB.7.1.1','Etkili iletişim','İletişim',[0,4],'ok');
 addKzR('SOS',7,'SB.7.2.1','Küreselleşme','Eleştirel düşünme',[3,7],'ok');
 addKzR('ING',7,'ENG.7.1.S1','School life (speaking)','İletişim',[0,4],'ok');
 addKzR('ING',7,'ENG.7.3.V1','Staying healthy and fit','İletişim',[3,7],'ok');
+// Öğrenci ekranında standart MEB İngilizce 2–8 programı kullanılır (çoklu yabancı dil modeli değil).
+function patchKzSource(id,patch){const k=KZ.find(x=>x.id===id);if(k)Object.assign(k,patch)}
+patchKzSource('ING7-1',{unit:1,unitName:'Theme 1: School Life & Education',name:'Okul yaşamı, okul dışı etkinlikler, yarışmalar ve millî günler hakkında anlamlı ve akıcı biçimde konuşmaya hazırlanır.',url:'https://tymm.meb.gov.tr/ingilizce-dersi-temel-egitim/unite/717',textMissing:false});
+patchKzSource('ING7-2',{unit:3,unitName:'Theme 3: Personal Life & Well-being',name:'Kişisel yaşam, iyi oluş, hastalıklar ve sağlığı korumaya ilişkin hedef kelimeleri bağlam içinde seçer ve kullanır.',url:'https://tymm.meb.gov.tr/ingilizce-dersi-temel-egitim/unite/730',textMissing:false});
 // önceki sınıf ön koşulu (simülasyon)
 addKzR('FEN',6,'FB.6.4.5','Işık ve renkler (6. sınıf)','Eleştirel düşünme',null,'none');
 
@@ -69,7 +73,7 @@ const Q_BANK = {
  'MAT7-4':{q:'3/4 + 2/5 işleminin sonucu kaçtır?',wrong:'Payları ve paydaları ayrı ayrı topladı: 5/9.',ans:'23/20',pref:['K','K','I']},
  'MAT7-5':{q:'3x + 2 − x + 5 ifadesini sadeleştiriniz.',wrong:'4x + 7 yazdı; −x terimini toplama olarak aldı.',ans:'2x + 7',pref:['I','K']},
  'MAT7-6':{q:'Bir sayının 2 katının 5 fazlası 17 ise sayı kaçtır?',wrong:'Denklemi 2x − 5 = 17 kurdu; ifadeyi modelleyemedi.',ans:'6',pref:['S','S','I']},
- 'MAT7-7':{q:'Bir araç sabit hızla 3 saatte 180 km gidiyor. Aynı hızla 5 saatte kaç km gider?',wrong:'182 km buldu; orantı yerine fark (toplamsal) ilişkisi kurdu.',ans:'300 km',pref:['S','K']},
+ 'MAT7-7':{q:'Bir sepette 12 elma ve 8 armut vardır. Elmaların armutlara oranı en sade biçimde nedir?',wrong:'2:3 yazdı; istenen sırayı ters çevirdi.',ans:'3:2',pref:['K','S']},
  'MAT7-8':{q:'Bir tarifte 2 su bardağı una 3 yumurta gerekiyor. 6 su bardağı un için kaç yumurta gerekir?',wrong:'7 yazdı; aradaki farkı ekledi.',ans:'9 yumurta',pref:['S']},
  'MAT8-1':{q:'√2, 0,75, π ve 5/8 sayılarından hangileri irrasyoneldir?',wrong:'0,75’i de seçti; ondalık gösterimi olan her sayıyı irrasyonel sandı.',ans:'√2 ve π',pref:['K','K','S']},
  'MAT8-2':{q:'2⁵ · 2³ ÷ 2⁴ işleminin sonucu kaçtır?',wrong:'2^(5·3−4) yazdı; üsleri çarptı.',ans:'2⁴',pref:['K','I']},

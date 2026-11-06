@@ -24,10 +24,22 @@ browser.newContext = ((orig) => async (...a) => { const c = await orig.apply(bro
 const text = (p, sel = 'body') => p.locator(sel).innerText();
 
 try {
+  // ---------------------------------------------------------------- 0. Ortak şifre sıfırlama akışı
+  const reset = await newCtx();
+  const rp = await reset.newPage();
+  await rp.goto(BASE + '/giris-auth#ogretmen');
+  await rp.click('button[data-mode="forgot"]');
+  await rp.fill('#resetEmail', 'selin@okul.test');
+  await rp.click('#forgot button.pri');
+  await rp.waitForSelector('.msg.ok');
+  check((await text(rp, '.msg.ok')).includes('Şifre yenileme e-postası'), 'giriş sayfası şifre yenileme e-postası istedi');
+  check(mock.calls.some((c) => c.includes('/auth/v1/recover')), 'Supabase Auth recovery endpointi çağrıldı');
+  await reset.close();
+
   // ---------------------------------------------------------------- 1. Öğretmen kaydı → yönetim
   const t = await newCtx();
   const page = await t.newPage();
-  await page.goto(BASE + '/giris#ogretmen');
+  await page.goto(BASE + '/giris-auth#ogretmen');
   await page.click('button[data-mode="signup"]');
   await page.fill('#fn', 'Selin Yılmaz');
   await page.fill('#em', 'selin@okul.test');
@@ -136,7 +148,7 @@ try {
   // ---------------------------------------------------------------- 3. Öğrenci girişi (sınıf kodu + isim + PIN)
   const s = await newCtx({ width: 390, height: 844 });
   const sp = await s.newPage();
-  await sp.goto(BASE + '/giris#ogrenci');
+  await sp.goto(BASE + '/giris-auth#ogrenci');
   await sp.fill('#cc', cc.toLowerCase());
   await sp.click('#f button.pri');
   await sp.waitForSelector('.names button');
@@ -200,7 +212,7 @@ try {
   // ---------------------------------------------------------------- 4. Veli kaydı (davet kodu + açık rıza)
   const v = await newCtx();
   const vp = await v.newPage();
-  await vp.goto(BASE + '/giris#veli');
+  await vp.goto(BASE + '/giris-auth#veli');
   await vp.click('button[data-mode="signup"]');
   await vp.fill('#ic', parentCode);
   await vp.fill('#fn', 'Ahmet Yıldız');
@@ -305,14 +317,14 @@ try {
   await ap.click('[data-act="naMode"][data-v="ai"]');
   check((await text(ap, '.ai-mode')).includes('Demo modu'), 'girişsiz kullanıcıda yapay zekâ demo modunda ve bu açıkça yazıyor');
   await ap.goto(BASE + '/yonetim');
-  await ap.waitForURL('**/giris#ogretmen', { timeout: 8000 });
+  await ap.waitForURL('**/giris-auth#ogretmen', { timeout: 8000 });
   check(true, 'girişsiz kullanıcı yönetimden giriş sayfasına yönlendirildi');
 
   // ---------------------------------------------------------------- 6. Çıkış
   await page.goto(BASE + '/yonetim');
   await page.waitForSelector('#out');
   await page.click('#out');
-  await page.waitForURL('**/giris', { timeout: 8000 });
+  await page.waitForURL('**/giris-auth', { timeout: 8000 });
   check(!(await page.evaluate(() => localStorage.getItem('navigaitor-auth'))), 'çıkışta oturum silindi');
 
   await vp.goto(BASE + '/ogrenci'); await vp.waitForURL('**/veli', { timeout: 8000 });

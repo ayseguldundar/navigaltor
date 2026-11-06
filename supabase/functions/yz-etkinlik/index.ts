@@ -9,6 +9,8 @@ const MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
 const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') || 40);
 // Tüm okullar için günlük toplam üst sınır (maliyet güvencesi).
 const GLOBAL_DAILY_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') || 300);
+const MAX_BODY_BYTES = 24 * 1024;
+const PERSONAL_DATA_RE = /(?:[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|(?:\+?90|0)\s?5\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}|\b\d{11}\b)/;
 
 const pick = (j: string | undefined, legacy: string | undefined) => {
   try { const o = JSON.parse(j ?? ''); if (o?.default) return o.default as string; } catch { /* eski anahtar */ }
@@ -152,7 +154,7 @@ const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.i
 function normalize(d: Obj) {
   const v = isObj(d.visual) ? d.visual : {};
   let vType = str(d.visual_type) || str(v.type) || (typeof d.visual === 'string' ? d.visual : '');
-  vType = VIS_TYPES.find((t) => new RegExp(`\\b${t}\\b`).test(vType)) ?? 'flow';
+  vType = VIS_TYPES.find((t) => new RegExp(`\b${t}\b`).test(vType)) ?? '';
   const vp = unJson(d.visual_params);
   const vParams = isObj(vp) ? vp : isObj(v.params) ? v.params : isObj(d.params) ? d.params : {};
   const vCaption = str(d.visual_caption) || str(v.caption) || str(d.caption);
@@ -173,6 +175,19 @@ function normalize(d: Obj) {
     misconception: str(d.misconception),
   };
 }
+const validDraft = (d: ReturnType<typeof normalize>) => {
+  const text = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  return text(d.title, 200) && text(d.subtitle, 300) && text(d.scenario, 3000)
+    && Array.isArray(d.kazanim) && d.kazanim.length >= 1 && d.kazanim.length <= 3
+    && Array.isArray(d.skills21) && d.skills21.length >= 2 && d.skills21.length <= 5
+    && Array.isArray(d.steps) && d.steps.length >= 3 && d.steps.length <= 6
+    && d.steps.every((s) => text(s.title, 160) && Array.isArray(s.items) && s.items.length >= 2 && s.items.length <= 6)
+    && Array.isArray(d.checklist) && d.checklist.length >= 4 && d.checklist.length <= 8
+    && Array.isArray(d.navi) && d.navi.length >= 2 && d.navi.length <= 4
+    && isObj(d.visual) && VIS_TYPES.includes(String(d.visual.type))
+    && Array.isArray(d.rubric) && d.rubric.length === 4
+    && d.rubric.every((r) => text(r.k, 120) && text(r.d, 300) && text(r.l4, 300) && text(r.l3, 300) && text(r.l2, 300) && text(r.l1, 300));
+};
 
 // Kazanım kodları ve HTML açılı ayraçları temizlenir (çıktı her ekranda ayrıca kaçışlanır).
 const CODE_RE = /\b(MAT|TUR|FEN|SOS|ING|FB|SB|ENG|T)\.?\s?\d+(\.\d+){1,3}\b/g;
@@ -193,15 +208,8 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return fail('Yapay zekâ henüz yapılandırılmadı (API anahtarı eksik).', 503);
-
-  const { data: quota, error: qErr } = await admin.rpc('srv_ai_quota', { p_teacher: prof.id, p_daily_limit: DAILY_LIMIT });
-  if (qErr || !quota) return fail('Üretim kotası denetlenemedi. Biraz sonra yeniden deneyin.', 503);
-  if (!quota.ok) return fail(`Günlük üretim sınırına ulaşıldı (${quota.limit}). Yarın yeniden deneyebilirsiniz.`, 429);
-  const { count: allToday, error: gErr } = await admin.from('ai_generations').select('id', { count: 'exact', head: true })
-    .gte('created_at', new Date(Date.now() - 864e5).toISOString());
-  if (gErr || allToday == null) return fail('Üretim kotası denetlenemedi. Biraz sonra yeniden deneyin.', 503);
-  if (allToday >= GLOBAL_DAILY_LIMIT) return fail('Sistem genelinde günlük üretim sınırına ulaşıldı. Yarın yeniden deneyebilirsiniz.', 429);
-
+  const bodySize = Number(req.headers.get('content-length') || 0);
+  if (bodySize > MAX_BODY_BYTES) return fail('İstek çok büyük.', 413);
   let b: Record<string, unknown>;
   try { b = await req.json(); } catch { return fail('Geçersiz istek'); }
   const course = String(b.course ?? '');
@@ -221,11 +229,16 @@ Deno.serve(async (req) => {
     digital: (Array.isArray(b.digital) ? b.digital : []).map(String).slice(0, 8),
     structure: String(b.structure ?? '').slice(0, 800),
   };
-
-  const { data: row, error: insErr } = await admin.from('ai_generations')
-    .insert({ school_id: prof.school_id, teacher_id: prof.id, request: req_, model: MODEL })
-    .select('id').single();
-  if (insErr || !row) return fail('Üretim kaydı oluşturulamadı. Biraz sonra yeniden deneyin.', 503);
+  if (PERSONAL_DATA_RE.test(Object.values(req_).flatMap((v) => Array.isArray(v) ? v : [v]).join(' '))) {
+    return fail('Kişisel iletişim veya kimlik bilgisi içeren istekler işlenemez.', 400);
+  }
+  const { data: quota, error: qErr } = await admin.rpc('srv_reserve_ai_generation', {
+    p_school: prof.school_id, p_teacher: prof.id, p_daily_limit: DAILY_LIMIT,
+    p_global_limit: GLOBAL_DAILY_LIMIT, p_request: req_, p_model: MODEL,
+  });
+  if (qErr || !quota) return fail('Üretim kotası denetlenemedi. Biraz sonra yeniden deneyin.', 503);
+  if (!quota.ok) return fail(quota.reason === 'global' ? 'Sistem genelinde günlük üretim sınırına ulaşıldı. Yarın yeniden deneyebilirsiniz.' : `Günlük üretim sınırına ulaşıldı (${quota.limit}). Yarın yeniden deneyebilirsiniz.`, 429);
+  const row = { id: quota.id };
 
   const prompt = [
     `Ders: ${COURSES[course]} · ${grade}. sınıf`,
@@ -272,7 +285,7 @@ Deno.serve(async (req) => {
   }
   const norm = draft ? normalize(draft) : null;
   const missing = norm ? (['title', 'scenario', 'steps', 'checklist'] as const).filter((k) => !norm[k] || (Array.isArray(norm[k]) && !norm[k].length)) : ['tümü'];
-  if (!norm || missing.length) {
+  if (!norm || missing.length || !validDraft(norm)) {
     await admin.from('ai_generations').update({ status: 'error', error: 'eksik çıktı: ' + missing.join(',') }).eq('id', row.id);
     return fail('Taslak eksik üretildi. Yeniden deneyin.', 502);
   }

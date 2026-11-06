@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NavigAItor Demo Panelleri</title>
+<meta name="description" content="NavigAItor öğretmen, öğrenci ve veli demo panelleri.">
+<meta name="theme-color" content="#F7EFE2">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
@@ -13,14 +17,16 @@
 body{margin:0;min-height:100vh;background:radial-gradient(1200px 600px at 10% -10%,#FBE3D6 0%,transparent 60%),var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:32px 16px}
 main{width:min(980px,100%)}
 .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-.logo{width:44px;height:44px;border-radius:12px;background:var(--brand);color:#fff;display:grid;place-items:center;font-family:'Source Serif 4',Georgia,serif;font-weight:700;font-size:22px}
-.login{margin-left:auto;padding:10px 18px;border-radius:12px;background:var(--brand);color:#fff;text-decoration:none;font-weight:800;font-size:15px}
+.brand-home{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none}
+.logo{width:44px;height:44px;border-radius:12px;background:#FFF8EC;border:1px solid #EADFCC;padding:3px;display:grid;place-items:center;flex:none;overflow:hidden}
+.logo img{width:100%;height:100%;display:block;object-fit:contain}
 .brand b{font-family:'Source Serif 4',Georgia,serif;font-size:24px}
 h1{font-family:'Source Serif 4',Georgia,serif;font-size:clamp(30px,5vw,46px);line-height:1.1;margin:0 0 12px}
-p.lead{font-size:17px;color:var(--muted);max-width:620px;margin:0 0 32px;line-height:1.6}
+p.lead{font-size:17px;color:var(--muted);max-width:720px;margin:0 0 32px;line-height:1.6}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 a.card{display:flex;flex-direction:column;gap:10px;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 14px 34px -24px rgba(60,30,10,.45);transition:transform .15s,box-shadow .15s}
 a.card:hover{transform:translateY(-3px);box-shadow:0 22px 40px -24px rgba(60,30,10,.55)}
+a.card:focus-visible{outline:3px solid #810000;outline-offset:3px}
 .ic{font-size:34px}
 a.card h2{font-family:'Source Serif 4',Georgia,serif;font-size:22px;margin:0}
 a.card span{color:var(--muted);font-size:14px;line-height:1.5}
@@ -31,15 +37,15 @@ footer{margin-top:28px;font-size:13px;color:var(--muted)}
 </head>
 <body>
 <main>
-  <div class="brand"><a href="/" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none"><div class="logo">N</div><b>NavigAItor</b></a><a class="login" href="/giris">Giriş yap</a></div>
+  <div class="brand"><a class="brand-home" href="/" aria-label="NavigAItor demo ana sayfa"><div class="logo"><img src="/icons/navigaitor-mark.png" alt=""></div><b>NavigAItor</b></a></div>
   <h1>Demo panelleri</h1>
-  <p class="lead">Kurgusal verilerle çalışan tanıtım panelleri. Gerçek okul hesabıyla çalışmak için sağ üstten giriş yapın. Öğretmen panelinde atadığınız etkinlikler, aynı tarayıcıda açtığınız öğrenci panelinde görünür.</p>
+  <p class="lead">Kurgusal verilerle çalışan öğretmen, öğrenci ve veli panellerinden birini seçin. Demo çalışmaları ve ilerleme bilgileri yalnızca bu tarayıcıda saklanır.</p>
   <div class="grid">
-    <a class="card" href="/demo/ogretmen"><div class="ic">👩‍🏫</div><h2>Öğretmen Paneli</h2><span>Etkinlik kütüphanesi, yapay zekâ ile etkinlik, Sıfır Hata sınavları, dijital ürünler ve 3 aylık gelişim raporu.</span><em>Paneli aç →</em></a>
-    <a class="card" href="/demo/ogrenci"><div class="ic">🎒</div><h2>Öğrenci Paneli</h2><span>Navi ile tanışma, çalışma planı, etkileşimli görsellerle etkinlikler ve simülasyonlar.</span><em>Paneli aç →</em></a>
-    <a class="card" href="/demo/veli"><div class="ic">👨‍👩‍👧</div><h2>Veli Paneli</h2><span>Çocuğun haftası, gelişimi, sınavları ve çalışma planı tek bakışta.</span><em>Paneli aç →</em></a>
+    <a class="card" href="/demo/ogretmen"><div class="ic" aria-hidden="true">👩‍🏫</div><h2>Öğretmen Paneli</h2><span>Etkinlik kütüphanesi, sınıf beceri görünümü, sınavlar ve gelişim raporları.</span><em>Öğretmen demosunu aç →</em></a>
+    <a class="card" href="/demo/ogrenci"><div class="ic" aria-hidden="true">🎒</div><h2>Öğrenci Paneli</h2><span>Navi ile tanışma, çalışma planı ve etkileşimli öğrenme etkinlikleri.</span><em>Öğrenci demosunu aç →</em></a>
+    <a class="card" href="/demo/veli"><div class="ic" aria-hidden="true">👨‍👩‍👧</div><h2>Veli Paneli</h2><span>Çocuğun haftası, gelişimi, sınavları ve çalışma planı.</span><em>Veli demosunu aç →</em></a>
   </div>
-  <footer>Panellerdeki demo verileri kurgusaldır ve yalnızca bu tarayıcıda saklanır. Okulunuz için hesap açmak: <a href="/giris#ogretmen">öğretmen girişi</a> · Öğrenci: <a href="/giris#ogrenci">sınıf kodu ile giriş</a> · Veli: <a href="/giris#veli">davet kodu ile kayıt</a></footer>
+  <footer>Demo panellerindeki tüm veriler kurgusaldır ve yalnızca bu tarayıcıda saklanır.</footer>
 </main>
 </body>
 </html>

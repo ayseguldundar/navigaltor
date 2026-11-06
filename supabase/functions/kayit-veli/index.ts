@@ -23,7 +23,7 @@ const clientIp = (req: Request) => (req.headers.get('x-forwarded-for') ?? '').sp
 const userMsg = (m: string) => (/Davet|davet|Okul adı|eşleşmiyor/.test(m) ? m.split('\n')[0].slice(0, 160) : '');
 const allowed = async (bucket: string, max: number, windowSec: number) => {
   const { data, error } = await admin.rpc('srv_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSec });
-  return error ? true : data === true; // veritabanı hatasında girişleri kilitleme (PIN kilidi ayrıca korur)
+  return !error && data === true; // rate-limit denetlenemiyorsa güvenli biçimde dur
 };
 
 Deno.serve(async (req) => {
