@@ -64,6 +64,27 @@ try {
   await stu.click('#obLayer [data-act="obNext"]'); await stu.waitForTimeout(200);
   await stu.click('#obLayer [data-act="obLater"]'); await stu.waitForTimeout(200);
   check(!(await stu.$('#obLayer .ob-card')), 'tanışma formu "sonra" ile kapanıyor');
+  await stu.evaluate(() => { UI.sf.course='MAT'; UI.sf.kz='MAT7-1'; UI.readyAutoPromptKey=null; location.hash = 'o-ders/icerik'; }); await stu.waitForTimeout(450);
+  const readyStart = await stu.evaluate(() => { const k=KZ.find(x=>x.id===UI.readyModalKid); return {kid:UI.readyModalKid,topic:k?.topic,modal:document.querySelector('#layer .modal')?.getAttribute('aria-label'),choices:document.querySelectorAll('#layer .modal [data-act="readyModalChoose"]').length}; });
+  check(readyStart.kid === 'MAT7-1' && readyStart.modal?.includes(readyStart.topic) && readyStart.choices === 4, 'kazanım açılınca yalnızca o konuya ait 10 soruluk popup açılıyor');
+  await stu.click('#layer .modal [data-act="readyModalChoose"][data-v="0"]'); await stu.click('#layer .modal .dr-ft [data-act="readyModalNext"]'); await stu.waitForTimeout(140);
+  check((await stu.locator('#layer .modal .card-hd').innerText()).includes('Soru 2 / 10'), 'hazırbulunuşluk yanıtı kaydedilip sıradaki soruya ilerliyor');
+  await stu.click('#layer .modal .dr-ft [data-act="closeLayer"]'); await stu.waitForTimeout(60);
+  check(await stu.locator('#view [data-act="readyOpen"]').count() === 1, 'kapatıldığında yalnızca mevcut kazanım için devam kontrolü kalıyor; tüm derslerin listesi yok');
+  await stu.click('#view [data-act="pickKz"][data-v="MAT7-2"]'); await stu.waitForTimeout(140);
+  check(await stu.evaluate(() => UI.readyModalKid === 'MAT7-2' && !!document.querySelector('#layer .modal')), 'başka kazanım seçilince yalnızca onun ölçüm popup’ı açılıyor');
+  await stu.click('#layer .modal .dr-ft [data-act="closeLayer"]'); await stu.waitForTimeout(50);
+  await stu.click('#view [data-act="pickKz"][data-v="MAT7-1"]'); await stu.waitForTimeout(140);
+  check((await stu.locator('#layer .modal .card-hd').innerText()).includes('Soru 2 / 10'), 'yarım kalan mevcut kazanım ölçümü kaldığı sorudan sürüyor');
+  await stu.click('#layer .modal .dr-ft [data-act="closeLayer"]'); await stu.waitForTimeout(50);
+  const animationAudit = await stu.evaluate(() => {
+    const ids=['MAT7-1','MAT7-2','MAT7-3','MAT7-4','MAT7-5','MAT7-6','MAT7-7','MAT7-8','TUR7-1','TUR7-2','TUR7-3','FEN7-1','FEN7-2','FEN7-3','SOS7-1','SOS7-2','ING7-1','ING7-2'];
+    const old={course:UI.sf.course,kz:UI.sf.kz,tab:UI.tabs.ctab,ready:UI.readyAutoPromptKey};
+    const out=ids.map(id=>{const k=KZ.find(x=>x.id===id);UI.sf.course=k.course;UI.sf.kz=id;UI.tabs.ctab='video';UI.readyAutoPromptKey=`${myStu().id}:${id}`;render();const svg=document.querySelector('#view svg.lesson-svg');return {title:svg?.querySelector('title')?.textContent,desc:svg?.querySelector('desc')?.textContent,controls:svg?.querySelectorAll('button,input,select,[data-act]').length||0,motion:svg?.querySelectorAll('.lesson-orb,.lesson-fill-a,.lesson-fill-b,.lesson-direction,.lesson-highlight').length||0};});
+    UI.sf.course=old.course;UI.sf.kz=old.kz;UI.tabs.ctab=old.tab;UI.readyAutoPromptKey=old.ready;render();return out;
+  });
+  check(animationAudit.length === 18 && animationAudit.every(x=>x.title&&x.desc&&x.controls===0&&x.motion>0), '18 kazanımın her birinde erişilebilir, etkileşimsiz ve hareketli görsel anlatım var');
+  check(!(await stu.locator('#view [role="tab"]').allInnerTexts()).some(x=>x.toLocaleLowerCase('tr').includes('örnek çöz')), 'Derslerim sekmelerinde Örnek çözümü kaldırıldı');
   await stu.evaluate(() => { location.hash = 'o-plan'; }); await stu.waitForTimeout(400);
   check(await stu.evaluate(() => DB.st.plan.some((t) => t.lib === 'sos-7-12') && document.querySelector('#view').innerText.length > 200), 'öğrenci panelinde çalışma planı açılıyor');
   check(!/ertele/i.test(await stu.evaluate(() => document.querySelector('#view').innerText)), 'çalışma planında Ertele seçeneği yok');

@@ -68,7 +68,7 @@
     contains(interests.values, fixed) || (interests.other && pattern.test(interests.other));
 
   function contextExamples(k, tab) {
-    if (!k || !['aciklama', 'video', 'ornek'].includes(tab)) return [];
+    if (!k || !['aciklama', 'video'].includes(tab)) return [];
     const a = internalAnswers();
     const course = String(k.course || '');
     const topicText = [k.name, k.topic, k.skill, k.unit, k.id].filter(Boolean).join(' ').toLocaleLowerCase('tr');
@@ -163,7 +163,7 @@
         const preferred = internalAnswers().mode.values[0] || '';
         const tabByMode = {
           'Kısa bir açıklama okumak': 'aciklama',
-          'Bir örneğin çözümünü izlemek': 'ornek',
+          'Bir örneğin çözümünü izlemek': 'aciklama',
           'Görsellerle anlatım görmek': 'aciklama',
           'Küçük bir etkinlik yapmak': 'etk',
           'Önce kendim bir soru denemek': 'set'

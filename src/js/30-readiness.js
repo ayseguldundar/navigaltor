@@ -1179,16 +1179,61 @@ function readyRecord(sid,kid,create=false){const byStudent=create?readyStudent(s
 function readyDate(){return new Date().toISOString().slice(0,10)}
 function readyDateLabel(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)?esc(fmtDL(value)):'—'}
 function readyCorrectCount(kid,r){return readyBank(kid).reduce((n,q,i)=>n+(r&&r.answers&&r.answers[i]===q[2]?1:0),0)}
-function readyPanel(s){
-  const ks=readyVisibleTopics(s);if(!ks.length)return '';
-  const done=ks.filter(k=>{const r=readyRecord(s.id,k.id);return r&&r.complete}).length;
-  return `<section class="ocard" style="border-color:#e7d6b8;background:linear-gradient(120deg,#fffaf0,#fff)"><div class="card-hd"><div class="t"><h2 class="o-h">Konu Hazırbulunuşluk Ölçümü</h2><div class="meta">Her konu için bir kez uygulanır · 10 kısa soru · kaldığın yerden devam edebilirsin</div></div><span class="pill p-krem">${done}/${ks.length} tamamlandı</span></div><p class="small muted" style="margin:0 0 12px">Bu başlangıç ölçümüdür; notunu, ustalığını veya oyun puanını etkilemez.</p><div class="col" style="gap:7px">${ks.map(k=>{const r=readyRecord(s.id,k.id);const status=r&&r.complete?`Tamamlandı · ${readyCorrectCount(k.id,r)}/10 · ${readyDateLabel(r.date)}`:r?`Devam ediyor · ${clamp(+r.current||0,0,10)}/10`: 'Henüz başlanmadı';const label=r&&r.complete?'Sonucu gör':r?'Devam et':'Başla';return `<div class="trow" style="padding:8px 0">${cIcon(k.course,18)}<div class="sp" style="min-width:0"><b>${esc(k.topic)}</b><div class="small muted">MEB ${esc(k.code)} · ${esc(k.name)} · <a href="${esc(readySource(k))}" target="_blank" rel="noopener noreferrer">Resmî kaynak</a></div><div class="small muted">Yoklanan beceri: ${esc(READY_SKILLS[k.id])}</div></div><span class="small muted">${esc(status)}</span><button class="btn sm ${r&&r.complete?'sec':'pri'}" data-act="readyOpen" data-v="${esc(k.id)}">${label}</button></div>`}).join('')}</div></section>`
+function readyActiveTopic(s){
+  if(!s||s.grade!==7)return null;
+  const course=UI.sf&&UI.sf.course||'MAT';
+  const courseTopics=KZ.filter(k=>k.grade===7&&k.course===course);
+  const selected=UI.sf&&UI.sf.kz;
+  const k=courseTopics.find(x=>x.id===selected)||(courseTopics.find(x=>READY_BANKS[x.id])||courseTopics[0]);
+  return k&&readyVisibleTopics(s).some(x=>x.id===k.id)?k:null;
+}
+function readyOutcomeControl(s,k){
+  const r=readyRecord(s.id,k.id);
+  if(r&&r.complete)return `<aside class="ai-box small" style="margin:0 0 14px"><b>Başlangıç ölçümü tamamlandı.</b> ${esc(k.topic)} · ${readyCorrectCount(k.id,r)}/10. Bu bir defalık ölçüm yeniden açılmaz.</aside>`;
+  const progress=r?clamp(+r.current||0,0,10):0;
+  return `<aside class="ai-box small" style="margin:0 0 14px"><div class="row"><span class="sp"><b>${esc(k.topic)} · başlangıç ölçümü</b><span class="meta" style="display:block">10 soru · ${progress?`${progress}/10 yanıtlandı; kaldığın yerden devam edebilirsin.`:'Bu ölçüm notu, ustalığı veya XP’yi etkilemez.'}</span></span><button class="btn sm pri" data-act="readyOpen" data-v="${esc(k.id)}">${progress?'Devam et':'Başla'}</button></div></aside>`;
+}
+function readyLaunchModal(k,s){
+  if(!k||!s||!READY_BANKS[k.id]||!readyVisibleTopics(s).some(x=>x.id===k.id))return false;
+  let r=readyRecord(s.id,k.id);
+  if(r&&r.complete)return false;
+  if(!r){r=readyRecord(s.id,k.id,true);save()}
+  UI.readyModalKid=k.id;
+  openModal(()=>readyModalContent(k.id),true);
+  return true;
+}
+function readyModalContent(kid){
+  const s=myStu(),k=KZ.find(x=>x.id===kid&&READY_BANKS[x.id]);
+  if(!k||!readyVisibleTopics(s).some(x=>x.id===kid))return {title:'Başlangıç ölçümü',body:stateBox('err','Konu bulunamadı','Bu konu için ölçüm erişilebilir değil.'),foot:'<button class="btn pri" data-act="closeLayer">Kapat</button>'};
+  const r=readyRecord(s.id,kid);
+  const bank=readyBank(kid);
+  const source=readySource(k);
+  if(r&&r.complete){
+    const score=readyCorrectCount(kid,r);
+    return {title:'Başlangıç ölçümü tamamlandı',sub:`${esc(k.topic)} · MEB ${esc(k.code)}`,body:`<div class="ai-box"><b>${score}/10 doğru</b><p style="margin:6px 0 0">Bu bir defalık başlangıç ölçümüdür; not, kazanım ustalığı, hata kaydı veya XP oluşturmaz.</p></div><p class="small muted">${esc(k.name)} · <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">Resmî kaynak</a></p>`,foot:'<button class="btn pri" data-act="closeLayer">Konuya dön</button>'};
+  }
+  const idx=clamp(+((r&&r.current)||0),0,9);
+  const [prompt,encoded,correct,why]=bank[idx];
+  const options=encoded.split('|');
+  const selected=r&&Number.isInteger(r.selected)?r.selected:null;
+  return {title:`Başlangıç ölçümü · ${esc(k.topic)}`,sub:`MEB ${esc(k.code)} · ${esc(k.name)} · <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">Resmî kaynak</a>`,body:`<div class="card-hd" style="margin-bottom:12px"><div class="meta">Yoklanan beceri: ${esc(READY_SKILLS[kid])}</div><span class="pill p-krem">Soru ${idx+1} / 10</span></div><div class="pbar" aria-label="İlerleme"><i style="width:${idx*10}%;--c:#810000"></i></div><h3 class="o-h" style="font-size:19px;line-height:1.45;margin:18px 0 12px">${esc(prompt)}</h3><div class="col" style="gap:8px">${options.map((o,i)=>`<button class="card" style="padding:11px 13px;text-align:left;border:1px solid ${selected===i?'#810000':'var(--line)'};background:${selected===i?'#fff6f2':'#fff'}" data-act="readyModalChoose" data-v="${i}" data-kid="${esc(kid)}" aria-pressed="${selected===i}"><b style="display:inline-grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#f5eee4;margin-right:9px">${String.fromCharCode(65+i)}</b>${esc(o)}</button>`).join('')}</div><p class="small muted" style="margin:12px 0 0">Yanıtlar kaydedilir. Kapatırsan daha sonra bu konudan kaldığın yerden devam edebilirsin. Bu ölçüm not, ustalık, hata kaydı veya XP’yi etkilemez.</p>`,foot:`<button class="btn sec" data-act="closeLayer">Kapat ve sonra devam et</button><button class="btn pri" data-act="readyModalNext" data-v="${esc(kid)}" ${selected===null?'disabled':''}>${idx===9?'Ölçümü tamamla':'Yanıtla ve ilerle'} ${ic('cr',14)}</button>`};
 }
 (function(){
-  const old= PAGES['o-ders'];
-  PAGES['o-ders']=(sub,param)=>{const p=old(sub,param);if(p&&p.html)p.html=readyPanel(myStu())+p.html;return p};
+  const old=PAGES['o-ders'];
+  PAGES['o-ders']=(sub,param)=>{
+    if(sub==='icerik'&&UI.sf&&!UI.sf.course)UI.sf.course='MAT';
+    const p=old(sub,param);
+    if(sub!=='icerik'||!p||!p.html){if(sub!=='icerik')UI.readyAutoPromptKey=null;return p}
+    const s=myStu(),k=readyActiveTopic(s);
+    if(!k){UI.readyAutoPromptKey=null;return p}
+    const key=`${s.id}:${k.id}`;
+    const r=readyRecord(s.id,k.id);
+    if(r&&r.complete)UI.readyAutoPromptKey=key;
+    else if(UI.readyAutoPromptKey!==key){UI.readyAutoPromptKey=key;readyLaunchModal(k,s)}
+    p.html=readyOutcomeControl(s,k)+p.html;
+    return p;
+  };
 })();
-
 PAGES['o-ready']=(kid)=>{
   const s=myStu();const k=KZ.find(x=>x.id===kid&&readyVisibleTopics(s).some(v=>v.id===x.id));
   const crumbs=[['Ana Sayfa','o-home'],['Derslerim','o-ders/tum'],['Hazırbulunuşluk','o-ready']];
@@ -1204,7 +1249,29 @@ function readyResultPage(s,k,r,crumbs){
   const rows=bank.map((item,i)=>{const chosen=r.answers&&Number.isInteger(r.answers[i])?r.answers[i]:-1;const opts=item[1].split('|');const ok=chosen===item[2];return `<div class="trow" style="align-items:flex-start"><span class="pill ${ok?'p-soft':'p-gray'}">${ok?'Doğru':'Geliştirilecek'}</span><div class="sp"><b class="small">${i+1}. ${esc(item[0])}</b><div class="small muted" style="margin-top:4px">Senin yanıtın: ${chosen>=0?esc(opts[chosen]):'Yanıt yok'} · Doğru yanıt: ${esc(opts[item[2]])}</div><div class="small" style="margin-top:4px">${esc(item[3])}</div></div></div>`}).join('');
   return {title:'Hazırbulunuşluk sonucu',crumbs:[...crumbs,[k.topic,'']],html:`<div class="row" style="margin-bottom:14px"><button class="btn sm ghost" data-go="o-ders/tum">${ic('back',14)} Derslerime dön</button></div><section class="ocard"><div class="card-hd"><div class="t"><span class="eyebrow">Bir defalık başlangıç ölçümü</span><h2 class="o-h">${esc(k.topic)}</h2><div class="meta">MEB ${esc(k.code)} · ${esc(k.name)} · <a href="${esc(readySource(k))}" target="_blank" rel="noopener noreferrer">Resmî kaynak</a></div><div class="small muted" style="margin-top:5px">Yoklanan beceri: ${esc(READY_SKILLS[k.id])}</div></div><span class="pill p-krem">${score}/10 · ${shownDate}</span></div><div class="ai-box"><b>Başlangıç düzeyi, not veya ustalık puanı değildir.</b> Sonuçlar öğrenme hedefini birlikte planlamak için betimleyici bir başlangıç göstergesidir; not, kazanım ustalığı, XP veya hata kaydı oluşturmaz.</div><h3 class="o-h" style="font-size:17px;margin:18px 0 8px">Soru bazında geri bildirim</h3><div class="col" style="gap:7px">${rows}</div><div class="row" style="margin-top:16px"><span class="sp"><b>Doğru yanıt sayısı: ${score} / 10</b><span class="small muted" style="display:block">Tekrar ölçüm yapılamaz; bu kayıt yalnızca başlangıç içindir.</span></span><button class="btn sec" data-go="o-ders/tum">Konu listesine dön</button></div></section>`}
 }
-ACT.readyOpen=el=>{const s=myStu(),k=KZ.find(x=>x.id===el.dataset.v);if(!k||!readyVisibleTopics(s).some(x=>x.id===k.id))return;go('o-ready/'+k.id)};
+ACT.readyOpen=el=>{
+  const s=myStu(),kid=el.dataset.v,k=KZ.find(x=>x.id===kid),active=readyActiveTopic(s);
+  if(!k||!active||active.id!==kid||!readyVisibleTopics(s).some(x=>x.id===kid))return;
+  readyLaunchModal(k,s);
+};
+ACT.readyModalChoose=el=>{
+  const s=myStu(),kid=el.dataset.kid,k=KZ.find(x=>x.id===kid);
+  if(!k||UI.readyModalKid!==kid||!readyVisibleTopics(s).some(x=>x.id===kid))return;
+  const r=readyRecord(s.id,kid),choice=+el.dataset.v;
+  if(!r||r.complete||!Number.isInteger(choice)||choice<0||choice>3)return;
+  r.selected=choice;save();render();
+};
+ACT.readyModalNext=el=>{
+  const s=myStu(),kid=el.dataset.v,k=KZ.find(x=>x.id===kid);
+  if(!k||UI.readyModalKid!==kid||!readyVisibleTopics(s).some(x=>x.id===kid))return;
+  const r=readyRecord(s.id,kid);
+  if(!r||r.complete||!Number.isInteger(r.selected)||r.selected<0||r.selected>3)return;
+  const idx=clamp(+r.current||0,0,9);r.answers=r.answers||{};
+  if(Object.prototype.hasOwnProperty.call(r.answers,idx))return;
+  r.answers[idx]=r.selected;r.selected=null;r.current=idx+1;
+  if(r.current===10){r.score=readyBank(kid).reduce((n,q,i)=>n+(r.answers[i]===q[2]?1:0),0);r.date=readyDate();r.complete=true}
+  save();render();
+};
 ACT.readyChoose=el=>{
   const s=myStu(),kid=UI.sub,k=KZ.find(x=>x.id===kid);if(!k||!READY_BANKS[kid])return;
   const r=readyRecord(s.id,kid);if(!r||r.complete)return;
