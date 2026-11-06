@@ -44,8 +44,17 @@ export function createMock() {
         source: a.p_source, template_id: a.p_template, due_date: a.p_due, created_at: new Date().toISOString(), archived: false, activity: a.p_activity };
       db.assignments.push(x); return x;
     },
-    reset_section_pins: (me, a) => db.students.filter((x) => x.section_id === a.p_section && x.active).map((x, i) => { const pin = String(5000 + i); db.secrets[x.id] = pin; return { id: x.id, first_name: x.first_name, last_name: x.last_name, student_no: x.student_no, pin }; }),
-    move_student: (me, a) => { const st = db.students.find((x) => x.id === a.p_student); const to = sectionView(me).find((x) => x.id === a.p_section); if (!st || !to) throw new Error('Bu taşıma için yetkiniz yok'); st.section_id = to.id; return null; },
+    reset_section_pins: (me, a) => {
+      if (me.role !== 'admin' || !db.sections.some((s) => s.id === a.p_section && s.school_id === me.school_id)) throw new Error('Yalnızca okul yöneticisi');
+      return db.students.filter((x) => x.section_id === a.p_section && x.active).map((x, i) => { const pin = String(5000 + i); db.secrets[x.id] = pin; return { id: x.id, first_name: x.first_name, last_name: x.last_name, student_no: x.student_no, pin }; });
+    },
+    move_student: (me, a) => {
+      const st = db.students.find((x) => x.id === a.p_student);
+      const to = db.sections.find((x) => x.id === a.p_section && x.school_id === me.school_id);
+      if (me.role !== 'admin') throw new Error('Yalnızca okul yöneticisi öğrenci taşıyabilir');
+      if (!st || st.school_id !== me.school_id || !to) throw new Error('Öğrenci ve hedef şube aynı okulda olmalı');
+      st.section_id = to.id; return null;
+    },
     set_staff_role: (me, a) => { if (me.role !== 'admin') throw new Error('Yalnızca okul yöneticisi'); const t = db.profiles.find((p) => p.id === a.p_user && p.school_id === me.school_id); if (!t) throw new Error('Kişi bu okulun öğretmenleri arasında yok'); t.role = a.p_role; return null; },
     archive_assignment: (me, a) => { db.assignments.find((x) => x.id === a.p_id).archived = a.p_archived; return null; },
     save_teacher_activity: (me, a) => { const d = { id: id(), school_id: me.school_id, teacher_id: me.id, title: a.p_activity.title, course: a.p_activity.course, grade: a.p_activity.grade, source: a.p_source, created_at: new Date().toISOString(), activity: a.p_activity }; db.drafts.push(d); return d; },
@@ -219,5 +228,5 @@ export function createMock() {
     return send(404, { message: 'taklitte yok: ' + p });
   }
 
-  return { db, calls, handle, addUser, session };
+  return { db, calls, handle, addUser, session, rpc };
 }

@@ -11,7 +11,7 @@
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
     "serve": "node scripts/serve.mjs",
-    "test": "node scripts/build.mjs && node tests/smoke.mjs && node tests/auth-flows.mjs && node tests/xss.mjs"
+    "test": "node scripts/build.mjs && node tests/smoke.mjs && node tests/auth-flows.mjs && node tests/xss.mjs && node tests/ai-visual-validation.mjs && node tests/ai-request-validation.mjs && node tests/security-mock.mjs"
   },
   "devDependencies": {
     "playwright": "^1.48.0"

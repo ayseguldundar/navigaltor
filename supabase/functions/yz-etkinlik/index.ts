@@ -4,6 +4,8 @@
 // - Ders kitapları soru havuzu olarak kullanılmaz: her taslak özgün üretilir; kütüphane etkinliği yalnızca yapı örneğidir.
 // - Taslak öğretmen onayı olmadan öğrenciye gitmez (onay ve atama istemci tarafında).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
+import { normalizeVisualType, VIS_TYPES } from '../_shared/visual-validation.mjs';
+import { readBoundedJson } from '../_shared/request-validation.mjs';
 
 const MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
 const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') || 40);
@@ -78,10 +80,6 @@ ${VISUALS}
 
 Sonucu MUTLAKA "etkinlik_kaydet" aracını bir kez çağırarak döndür; ayrıca düz metin yazma.`;
 
-const VIS_TYPES = ['flow', 'organizer', 'sort', 'cards', 'chat', 'news', 'timeline', 'routine', 'bars', 'pie', 'budget',
-  'pizza', 'balance', 'numberline', 'areagrid', 'cubes', 'coord', 'dice', 'zoom', 'solar', 'circuit', 'heat', 'light', 'force',
-  'atom', 'lever', 'shapes'];
-
 const TOOL = {
   name: 'etkinlik_kaydet',
   description: 'Tasarlanan etkinliği NavigAItor etkinlik biçiminde kaydeder.',
@@ -153,8 +151,7 @@ const strs = (v: unknown, max = 8): string[] => {
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 function normalize(d: Obj) {
   const v = isObj(d.visual) ? d.visual : {};
-  let vType = str(d.visual_type) || str(v.type) || (typeof d.visual === 'string' ? d.visual : '');
-  vType = VIS_TYPES.find((t) => new RegExp(`\b${t}\b`).test(vType)) ?? '';
+  const vType = normalizeVisualType(str(d.visual_type) || str(v.type) || (typeof d.visual === 'string' ? d.visual : ''));
   const vp = unJson(d.visual_params);
   const vParams = isObj(vp) ? vp : isObj(v.params) ? v.params : isObj(d.params) ? d.params : {};
   const vCaption = str(d.visual_caption) || str(v.caption) || str(d.caption);
@@ -208,10 +205,10 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return fail('Yapay zekâ henüz yapılandırılmadı (API anahtarı eksik).', 503);
-  const bodySize = Number(req.headers.get('content-length') || 0);
-  if (bodySize > MAX_BODY_BYTES) return fail('İstek çok büyük.', 413);
-  let b: Record<string, unknown>;
-  try { b = await req.json(); } catch { return fail('Geçersiz istek'); }
+  const parsed = await readBoundedJson(req, MAX_BODY_BYTES);
+  if (!parsed.ok) return fail(parsed.status === 413 ? 'İstek çok büyük.' : 'Geçersiz istek.', parsed.status);
+  if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) return fail('Geçersiz istek.');
+  const b = parsed.value as Record<string, unknown>;
   const course = String(b.course ?? '');
   const grade = Number(b.grade);
   const outcome = String(b.outcome ?? '').trim();
@@ -266,12 +263,12 @@ Deno.serve(async (req) => {
       }),
     });
   } catch (e) {
-    await admin.from('ai_generations').update({ status: 'error', error: String(e) }).eq('id', row.id);
+    await admin.from('ai_generations').update({ status: 'error', error: 'provider_unreachable' }).eq('id', row.id);
     return fail('Yapay zekâ hizmetine ulaşılamadı. Biraz sonra yeniden deneyin.', 502);
   }
   const out = await res.json().catch(() => ({}));
   if (!res.ok) {
-    await admin.from('ai_generations').update({ status: 'error', error: JSON.stringify(out).slice(0, 2000) }).eq('id', row.id);
+    await admin.from('ai_generations').update({ status: 'error', error: `provider_http_${res.status}` }).eq('id', row.id);
     return fail(res.status === 529 || res.status === 429 ? 'Yapay zekâ şu an yoğun. Bir dakika sonra yeniden deneyin.'
       : 'Taslak üretilemedi.', 502);
   }
