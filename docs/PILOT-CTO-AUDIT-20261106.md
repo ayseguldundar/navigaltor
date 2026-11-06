@@ -106,3 +106,8 @@ Son test turunda `tests/security-mock.mjs` de eklendi ve `npm test` akışına b
 ## Staging değişken adları
 
 Staging secret/config adları (değerler bu rapora alınmadı): `SUPABASE_URL`, `SUPABASE_SECRET_KEYS` (tercih edilen) veya eski kurulumlarda `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT`. Bunlar yalnız doğru Supabase Edge Function secret store’a girilmeli; e-posta doğrulama/redirect/SMTP ayarları Supabase Auth panelinde ayrıca doğrulanmalı.
+
+
+### PR durum damgası
+
+`ccdfe41` head’i sonrası son kontrolde PR `OPEN` ve merge edilmemişti. GitHub Actions `CI/test` ve Vercel deployment **pending** durumundaydı; Vercel Preview Comments check başarılıydı. Önceki head’deki Vercel success, dokümantasyon commit’i sonrası yeni Preview deploy’un tamamlandığı anlamına gelmez. Production deploy yapılmadı.
