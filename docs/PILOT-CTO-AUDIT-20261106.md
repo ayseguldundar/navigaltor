@@ -80,3 +80,29 @@ Bu testler yerel/mock/test kodu kanıtıdır. **Gerçek staging Supabase RLS/Edg
 ### Test kapsamı ek notu
 
 Son test turunda `tests/security-mock.mjs` de eklendi ve `npm test` akışına bağlandı. Bu, öğretmen rolünde toplu PIN yenileme/öğrenci taşıma reddini ve okul dışı taşıma reddini **mock** modelinde sınar; SQL/RLS veya staging testi değildir. Bu ekle birlikte son `npm test` ve `npm run check` çalışmaları başarılıdır.
+
+
+## Dokuz kabul kriteri — sonuç tablosu
+
+| # | Kriter | Durum ve kanıt |
+|---|---|---|
+| 1 | Yönetici → öğretmen/şube/öğrenci kurulumu; başka cihazdan doğru öğrenci hesabı | **Staging’de doğrulanmadı.** Mock auth akışıyla bazı UI işlemleri geçiyor; iki gerçek cihaz/hesap ve DB kanıtı yok. |
+| 2 | Öğretmen ataması → öğrencinin görüp tamamlaması → öğretmenin gerçek DB ilerlemesini görmesi | **Mock geçti, gerçek DB bekliyor.** `tests/auth-flows.mjs` simüle edilen atama/tamamlama/öğretmen görünümünü doğruluyor; gerçek Supabase staging teslimi yok. |
+| 3 | Veli yalnız bağlı çocuklarını görür | **Mock geçti, RLS kanıtı yok.** UI mock’unda bağlı çocuk akışı çalışıyor; başka çocuk/aileye doğrudan REST sorgusu staging’de denenmedi. |
+| 4 | Başka okul/şube/öğrenci/aile ve yetkisiz davet erişimi reddedilir | **Kısmi mock, staging bekliyor.** Yeni `tests/security-mock.mjs` admin/öğretmen ve okul sınırını mock’ta doğruluyor; DB/RLS, başka aile ve bozuk/expired/replay davet negatif testleri yok. |
+| 5 | Yanlış PIN, brute-force, tekrar/süresi dolmuş davet, rate-limit hatası, paralel kota ve çıkış sonrası eski veri | **Kısmi mock; kritik entegrasyonlar açık.** Yanlış PIN, tek kullanımlık davet ve çıkış UI mock’larında mevcut; brute-force eşzamanlılığı, expired/replay, rate-limit fail-closed, paralel AI kota yarışı ve çıkış sonrası cache verisi gerçek staging’de test edilmedi. |
+| 6 | AI hata/bozuk çıktı/kota/rol/girdi senaryoları | **Kısmi yerel test, gerçek AI/staging yok.** Geçersiz görsel türleri ve gövde boyutu Node’da sınanıyor; akış testindeki üretim mock; provider failure, bozuk tam payload, gerçek quota/role ve kişisel veri senaryoları henüz staging’de çalıştırılmadı. |
+| 7 | Build, otomatik testler ve gerçek staging entegrasyon testleri temiz | **Yerel build/test temiz; kriter tamamlanmadı.** Yerel `npm test` geçti; GitHub Actions `CI/test` son kontrolde QUEUED, Vercel Preview başarılı. Gerçek staging entegrasyon testi yok. |
+| 8 | Belgelenen Node sürümüyle yeni klon kurulum/CI tekrarlanır | **Yerelde geçti, CI sonucu bekliyor.** Node `22.23.4` ile `npm ci`, `npm run check`, `npm test` geçti; workflow Node `22.x` kullanıyor; GitHub CI henüz sonuçlanmamıştı. |
+| 9 | Pilot dışı/gerçek veriye bağlı olmayan özellikler listelenir | **Kısmi.** Bu rapor offline desteğin statik kabukla sınırlı olduğunu, gerçek Supabase/AI/SMTP ayarlarına bağlı akışları ve karar bekleyen AI geçmişini listeliyor. Canlı veriye veya servis durumuna bağlı tüm feature flag/env kombinasyonlarının envanteri çıkarılmadı. |
+
+## Geri alma planı
+
+- **Mevcut durum:** PR açık, merge edilmedi; bu dal için Vercel Preview başarıyla oluştu. Production deploy, Supabase migration veya gerçek kullanıcı verisi değişikliği yapılmadı. PR merge edilmeden kapatılabilir; dal/commit `7ed54d20` güvenle ayrık kalır.
+- **Kod geri alma:** Merge/deploy sonrasında hata görülürse, önce son bilinen iyi Vercel production sürümüne platformun rollback/terfi mekanizmasıyla dönün; ardından sebebi gideren revert PR açın. Preview deploy production rollback gerektirmez.
+- **DB geri alma:** Bu migration tabloya veri yazmıyor; `reset_section_pins`, `move_student`, `srv_rate_limit` fonksiyon gövdeleri ve ACL’lerini değiştiriyor. Staging’de test edilmiş, önceki migration’lardaki tam gövdeleri/ACL’leri geri yükleyen ayrı ve review edilmiş SQL rollback migration’ı olmadan production’a uygulanmamalı. Migration dosyasını silmek çalışan veritabanını geri almaz. Rollback eski yetki ve rate-limit yarış risklerini yeniden getireceği için yalnız kontrollü kurtarma adımıdır.
+- **Veri kurtarma:** Herhangi production değişikliğinden önce yedek/restore provası şarttır; bu çalışmada yedek alınmadı, restore testi yapılmadı.
+
+## Staging değişken adları
+
+Staging secret/config adları (değerler bu rapora alınmadı): `SUPABASE_URL`, `SUPABASE_SECRET_KEYS` (tercih edilen) veya eski kurulumlarda `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT`. Bunlar yalnız doğru Supabase Edge Function secret store’a girilmeli; e-posta doğrulama/redirect/SMTP ayarları Supabase Auth panelinde ayrıca doğrulanmalı.
