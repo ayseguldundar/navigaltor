@@ -39,6 +39,17 @@ try {
   for (const r of teacherRoutes) { await go(r); if ((await viewText()).length < 150) empty.push(r); }
   check(empty.length === 0, `öğretmen sayfalarının hepsi içerikli${empty.length ? ' — boş: ' + empty.join(', ') : ''}`);
 
+  await go('analytics/sinif');
+  const classDist = await page.evaluate(() => { const rows=[...document.querySelectorAll('.class-dist-row')]; return {rows:rows.length,groups:document.querySelectorAll('.class-dist-group').length,threshold:document.querySelectorAll('.class-dist-threshold').length,mean:document.querySelectorAll('.class-dist-average').length,accessible:rows.every(x=>x.tagName==='BUTTON'&&x.getAttribute('aria-label')&&x.dataset.v),oldDots:document.querySelectorAll('svg.chart circle').length}; });
+  check(classDist.rows > 0 && classDist.groups > 0 && classDist.threshold === classDist.rows && classDist.mean === classDist.rows && classDist.accessible && classDist.oldDots === 0, 'Sınıf Performansı öğrenci puanlarını eşik ve şube ortalaması işaretli yatay çubuklarla gösteriyor');
+  await page.click('[data-act="tableT"][data-k="strip"]'); await page.waitForTimeout(120);
+  check(await page.evaluate(() => UI.table.strip === true && !document.querySelector('.class-distribution')), 'Sınıf Performansı tablo görünümüyle alternatif sunuyor');
+  await page.click('[data-act="tableT"][data-k="strip"]'); await page.waitForTimeout(120);
+  const distStudent = await page.locator('.class-dist-row').first().getAttribute('data-v');
+  await page.locator('.class-dist-row').first().click(); await page.waitForTimeout(180);
+  check(page.url().includes('#student/assess/' + distStudent), 'grafikteki öğrenci çubuğu öğrenci profiline açılıyor');
+  await go('analytics/sinif');
+
   // 100 etkinlik ve görselleri
   const ids = await page.evaluate(() => ACTLIB.map((a) => a.id));
   check(ids.length === 100, `kütüphanede 100 etkinlik var (${ids.length})`);

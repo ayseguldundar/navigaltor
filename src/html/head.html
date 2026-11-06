@@ -307,6 +307,42 @@ table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 /* charts */
 .chart{width:100%;display:block;overflow:visible}
 .chart text{font-family:var(--sans);fill:var(--ink3);font-size:11px}
+.class-distribution{display:grid;gap:12px}
+.class-dist-legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--ink2);font-size:11.5px}
+.class-dist-legend>span{display:inline-flex;align-items:center;gap:6px}
+.class-dist-key{width:12px;height:12px;border-radius:4px;display:inline-block;background:#a94b4b}
+.class-dist-key.is-meets{background:#438677}
+.class-dist-key.is-threshold{width:2px;height:14px;border-left:2px dashed #8e6c4c;background:transparent;border-radius:0}
+.class-dist-key.is-average{width:2px;height:14px;background:#1e1b19;border-radius:0}
+.class-dist-axis,.class-dist-row{display:grid;grid-template-columns:minmax(115px,190px) minmax(150px,1fr) 58px;gap:12px;align-items:center}
+.class-dist-axis{min-height:28px;color:var(--ink3);font-size:10.5px;font-weight:700}
+.class-dist-axis-track{position:relative;height:22px;margin:0 2px}
+.class-dist-axis-track span{position:absolute;top:0;transform:translateX(-50%);font-variant-numeric:tabular-nums}
+.class-dist-axis-track span:first-child{transform:none}
+.class-dist-axis-track span:last-child{transform:translateX(-100%)}
+.class-dist-axis-track span.is-threshold{color:#8a4242;font-weight:800}
+.class-dist-axis-label{text-align:right}
+.class-dist-groups{display:grid;gap:14px}
+.class-dist-group{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.45)}
+.class-dist-group-head{display:flex;flex-wrap:wrap;align-items:center;gap:7px 10px;padding:10px 12px;background:rgba(80,55,30,.035);border-bottom:1px solid var(--line)}
+.class-dist-section{font-size:14px;color:var(--ink)}
+.class-dist-chip{padding:4px 8px;background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--ink2)}
+.class-dist-rows{display:grid;padding:7px 8px}
+.class-dist-row{width:100%;min-height:34px;padding:4px 7px;text-align:left;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer;transition:background 150ms}
+.class-dist-row:hover{background:rgba(129,0,0,.05)}
+.class-dist-row:focus-visible{outline:2px solid var(--bordo);outline-offset:1px;background:rgba(129,0,0,.05)}
+.class-dist-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--ink2)}
+.class-dist-track{position:relative;display:block;height:14px;border-radius:999px;background-color:rgba(55,40,25,.08);background-image:repeating-linear-gradient(to right,transparent 0 calc(20% - 1px),rgba(80,65,50,.16) calc(20% - 1px) 20%)}
+.class-dist-fill{position:absolute;inset:0 auto 0 0;border-radius:inherit;transition:width 300ms}
+.class-dist-row.is-below .class-dist-fill{background:linear-gradient(90deg,#a94b4b,#ca7771)}
+.class-dist-row.is-meets .class-dist-fill{background:linear-gradient(90deg,#2e7567,#58a38a)}
+.class-dist-threshold{position:absolute;z-index:2;left:70%;top:-4px;bottom:-4px;border-left:2px dashed #8e6c4c;pointer-events:none}
+.class-dist-average{position:absolute;z-index:3;left:var(--class-avg);top:-3px;bottom:-3px;width:2px;background:#1e1b19;box-shadow:0 0 0 1px rgba(255,255,255,.75);pointer-events:none}
+.class-dist-score{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.class-dist-score small{font-size:10px;font-weight:500;color:var(--ink3);margin-left:2px}
+.class-dist-empty{padding:18px;color:var(--ink3);background:rgba(80,55,30,.035);font-size:12.5px}
+@media(max-width:700px){.class-dist-axis,.class-dist-row{grid-template-columns:minmax(78px,106px) minmax(95px,1fr) 44px;gap:7px}.class-dist-row{padding:4px}.class-dist-name{font-size:11px}.class-dist-score{font-size:11px}.class-dist-legend{gap:7px 11px}.class-dist-legend>span{font-size:10.5px}}
+@media(min-width:900px){.class-distribution{padding-right:140px}}
 .bar-g rect.b{transform-box:fill-box;transform-origin:bottom;animation:barup 250ms var(--ease) backwards;transition:opacity 160ms}
 .bar-g:hover rect.b{opacity:.85}
 .bar-g{cursor:pointer}
