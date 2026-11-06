@@ -72,6 +72,9 @@ svg.i{flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:ro
 .side-ft{padding:10px 12px 14px;border-top:1px solid var(--side-line);display:flex;align-items:center;gap:8px}
 .brand{font-family:var(--serif);font-weight:600;color:var(--krem);font-size:15px;flex:1}
 .brand span{color:#fff}
+.brand-lockup{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.brand-lockup .brand{flex:none}
+.brand-mark{width:26px;height:26px;flex:none;display:block;object-fit:contain;padding:3px;border-radius:8px;background:#FFF7EA;box-shadow:0 0 0 1px rgba(232,201,153,.45)}
 .icb-s{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--side-ink);transition:background var(--t)}
 .icb-s:hover{background:rgba(255,244,228,.08)}
 .collapsed{--side-w:76px}
@@ -81,6 +84,7 @@ svg.i{flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:ro
 .collapsed .side .org,.collapsed .side .me{justify-content:center}
 .collapsed .side .me{padding:8px 0;background:none}
 .collapsed .side-ft{flex-direction:column}
+.collapsed .side-ft .brand-lockup{flex:none}
 
 /* ---------- main ---------- */
 .main{position:relative;z-index:1;margin-left:calc(var(--side-w) + 24px);padding:12px 20px 48px 0;transition:margin-left 220ms var(--ease);min-height:100%}

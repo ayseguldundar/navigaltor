@@ -24,7 +24,7 @@ function stuSidebar(){const s=myStu();
     const on=UI.route===n.id||(n.id==='o-calisma'&&UI.route==='o-soru');const open=n.subs&&UI.navOpen.has(n.id);const c=n.cnt?n.cnt():0;
     h+=`<button class="nv ${on?'on':''} ${open?'open':''}" data-act="onav" data-v="${n.id}" ${on?'aria-current="page"':''} ${n.subs?`aria-expanded="${!!open}"`:''} ${UI.collapsed?`data-tip="${n.l}"`:''}>${ic(n.ic,19)}<span class="lbl">${n.l}</span>${c?`<span class="cnt" aria-label="${c} ${n.cntL}">${c}</span>`:''}${n.subs?ic('cd',15,'car'):''}</button>`;
     if(n.subs)h+=`<div class="sub ${open?'open':''}"><div>${n.subs.map(([s2,l])=>`<button class="${on&&UI.sub===s2?'on':''}" data-go="${n.id}/${s2}" tabindex="${open?0:-1}">${l}</button>`).join('')}</div></div>`});
-  return h+`</nav><div class="side-ft"><span class="brand">Navig<span>AI</span>tor</span><button class="icb-s" data-act="collapse" aria-label="Menüyü daralt">${ic('panel',18)}</button></div>`}
+  return h+`</nav><div class="side-ft"><div class="brand-lockup"><img class="brand-mark" src="/icons/navigaitor-mark.png" alt=""><span class="brand">Navig<span>AI</span>tor</span></div><button class="icb-s" data-act="collapse" aria-label="Menüyü daralt">${ic('panel',18)}</button></div>`}
 ACT.onav=el=>{const id=el.dataset.v;const n=SNAV.find(x=>x.id===id);if(n.subs){if(UI.route===id){UI.navOpen.has(id)?UI.navOpen.delete(id):UI.navOpen.add(id);$('#side').innerHTML=sidebar();return}go(id+'/'+n.subs[0][0])}else go(id)};
 function stuTop(P){const n=DB.st.notifs.filter(x=>!x.read).length;
   return `<button class="icb menu-btn" data-act="navOpen" aria-label="Menüyü aç">${ic('menu')}</button>
