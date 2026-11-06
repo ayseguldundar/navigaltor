@@ -2,6 +2,8 @@
 
 _30 Ekim 2026 · Kapsam: tek okul, gözetimli pilot (1–3 şube, yaklaşık 30–90 öğrenci ve velileri)_
 
+> Bu tarihli rapor önceki durumu kaydeder. 6 Kasım 2026 `main` denetimi, doğrulanmış yeni bulgular ve bu dalda hazırlanan düzeltmeler için [güncel CTO audit raporuna](PILOT-CTO-AUDIT-20261106.md) bakın; bu branch/staging doğrulaması production hazır olduğu anlamına gelmez.
+
 ## Karar
 
 **Bu dal, staging doğrulaması ve üretim onay kapıları tamamlanmadan “pilot için teknik olarak hazır” ilan edilmemelidir.** Mock tabanlı uçtan uca akışlar temiz geçiyor; canlı Vercel frontend’i erişilebilir; ancak canlı Supabase migration geçmişi repo ile eşleşmiyor ve gerçek RLS/Edge Function izolasyon testleri henüz otomatikleştirilmedi.
