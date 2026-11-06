@@ -22,7 +22,10 @@ try {
   await page.goto(BASE + '/demo');
   check((await page.locator('a.card').count()) === 3, 'demo sayfasında üç panel bağlantısı var');
   await page.goto(BASE + '/');
-  check((await page.title()) === 'NavigAItor' && (await page.locator('a[href="/giris"]').count()) > 0, 'ana sayfa yeni tasarımla açılıyor ve giriş bağlantısı var');
+  check((await page.title()) === 'NavigAItor Demo Panelleri' && (await page.locator('a.card').count()) === 3 && (await page.locator('a[href="/giris"]').count()) === 0, 'ana sayfa yalnızca demo panellerini gösteriyor');
+  await page.goto(BASE + '/giris');
+  await page.waitForURL((url) => new URL(url).pathname === '/', { timeout: 5000 });
+  check((await page.locator('a.card').count()) === 3, '/giris adresi demo ana sayfasına yönleniyor');
 
   // Öğretmen paneli: tüm sayfalar
   await page.goto(BASE + '/demo/ogretmen');

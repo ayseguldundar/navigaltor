@@ -98,7 +98,7 @@ function parentView() {
 async function signedInView(p) {
   app.innerHTML = `<h1>Hoş geldiniz</h1><p class="muted"><b>${esc(p.full_name)}</b> olarak giriş yaptınız (${ROLE_TR[p.role]}).</p>
     <div class="row" style="margin-top:14px"><a class="btn pri lg" href="${homeFor(p.role)}">Devam et</a><button class="btn" id="out">Çıkış yap</button></div>`;
-  document.getElementById('out').onclick = () => signOut('/giris');
+  document.getElementById('out').onclick = () => signOut('/giris-auth');
 }
 
 function draw() {

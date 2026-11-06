@@ -9,7 +9,7 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.route(/fonts\./, (r) => r.abort());
-await page.goto(`http://localhost:${PORT}/giris`);
+await page.goto(`http://localhost:${PORT}/giris-auth`);
 await page.addScriptTag({ url: '/app/kit-gorsel.js' });
 const result = await page.evaluate(() => {
   window.__pwn = 0;

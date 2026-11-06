@@ -17,7 +17,7 @@ function form() {
 
 function expired() {
   render(`<h1>Bağlantı geçersiz</h1>${message('err', 'Bu şifre yenileme bağlantısı geçersiz veya süresi dolmuş.')}
-    <p class="muted">Giriş sayfasına dönüp yeni bir şifre yenileme bağlantısı isteyin.</p><a class="btn pri lg" style="width:100%" href="/giris">Giriş sayfasına dön</a>`);
+    <p class="muted">Giriş sayfasına dönüp yeni bir şifre yenileme bağlantısı isteyin.</p><a class="btn pri lg" style="width:100%" href="/giris-auth">Giriş sayfasına dön</a>`);
 }
 
 async function submit(e) {
@@ -33,7 +33,7 @@ async function submit(e) {
     if (error) throw error;
     await supabase.auth.signOut();
     render(`<h1>Şifreniz yenilendi</h1>${message('ok', 'Yeni şifreniz kaydedildi. Artık yeni şifrenizle sisteme giriş yapabilirsiniz.')}
-      <a class="btn pri lg" style="width:100%" href="/giris">Giriş yap</a>`);
+      <a class="btn pri lg" style="width:100%" href="/giris-auth">Giriş yap</a>`);
   } catch (err) {
     busy = false; form();
     const out2 = app.querySelector('#resetMsg');

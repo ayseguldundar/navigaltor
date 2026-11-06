@@ -35,7 +35,7 @@
     const F=UI.ai;let h=_form();
     const banner=live()
       ?`<div class="ai-mode on">${ic('spark',14)} <b>Gerçek yapay zekâ açık.</b> Taslak, seçtiğiniz kazanım ve öğrenci düzeyine göre Claude ile özgün üretilir (yaklaşık 30–60 sn). Öğrenci bilgisi gönderilmez.${F&&F.quota?` · Bugün: ${F.quota.used+1}/${F.quota.limit}`:''}</div>`
-      :`<div class="ai-mode">${ic('info',14)} <b>Demo modu:</b> taslak hazır etkinlik yapısından uyarlanır. Gerçek yapay zekâ için <a href="/giris#ogretmen">öğretmen hesabıyla giriş yapın</a>.</div>`;
+      :`<div class="ai-mode">${ic('info',14)} <b>Demo modu:</b> taslak hazır etkinlik yapısından uyarlanır. Bu demo sürümünde gerçek yapay zekâ kapalıdır.</div>`;
     if(F&&F.err)h=h.replace('</section>',`<div class="ai-err" role="alert">${ic('alert',14)} ${esc(F.err)}</div></section>`);
     return banner+h};
 

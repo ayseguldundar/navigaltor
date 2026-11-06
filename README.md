@@ -6,14 +6,16 @@
 
 | Sayfa | Yol |
 |---|---|
-| Giriş | `/` |
-| Öğretmen Paneli | `/ogretmen` |
+| Demo seçimi | `/` ve `/demo` |
+| Öğretmen demo paneli | `/demo/ogretmen` |
+| Öğrenci demo paneli | `/demo/ogrenci` |
+| Veli demo paneli | `/demo/veli` |
+| Pilot hesap girişi | `/giris-auth` |
 | Öğrenci Paneli | `/ogrenci` |
 | Veli Paneli | `/veli` |
-| Giriş (öğretmen, öğrenci, veli) | `/giris` |
 | Yönetim (şubeler, öğrenciler, davetler) | `/yonetim` |
 
-> **Pilot branch durumu:** hesaplar, roller, sınıf kodu + PIN ile öğrenci girişi, atama/teslim akışı ve Claude etkinlik üretimi Supabase üzerinde çalışacak şekilde kodlanmıştır. `/demo` kurgusal veridir; gerçek pilot akışı `/giris`, `/yonetim`, `/ogrenci` ve `/veli` rotalarındadır. Canlı migration ve Edge Function sürümleri branch ile ayrıca karşılaştırılmalıdır: [docs/PILOT-HAZIRLIK-RAPORU.md](docs/PILOT-HAZIRLIK-RAPORU.md)
+> **Pilot branch durumu:** `/` ve `/demo` yalnızca kurgusal demo panellerini açar; `/giris` ana demo seçicisine yönlenir. Gerçek pilot hesap girişi `/giris-auth` adresinde korunmuştur. Hesaplar, roller, sınıf kodu + PIN ile öğrenci girişi, atama/teslim akışı ve Claude etkinlik üretimi Supabase üzerinde çalışacak şekilde kodlanmıştır. Canlı migration ve Edge Function sürümleri branch ile ayrıca karşılaştırılmalıdır: [docs/PILOT-HAZIRLIK-RAPORU.md](docs/PILOT-HAZIRLIK-RAPORU.md)
 
 ## Geliştirme
 
